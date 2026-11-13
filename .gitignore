@@ -1,0 +1,14 @@
+**/target/
+.cong-cu/
+cau-hinh/may-chu.properties
+cau-hinh/may-khach.properties
+nhat-ky/
+.idea/
+*.iml
+
+sao-luu/
+
+du-lieu/
+**/du-lieu/
+
+*.log
