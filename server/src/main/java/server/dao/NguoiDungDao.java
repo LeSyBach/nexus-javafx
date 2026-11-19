@@ -14,6 +14,16 @@ public final class NguoiDungDao {
         this.csdl = csdl;
     }
 
+    public boolean tonTai(long id) throws SQLException {
+        try (Connection db = csdl.moKetNoi();
+             PreparedStatement lenh = db.prepareStatement("SELECT 1 FROM nguoi_dung WHERE id=?")) {
+            lenh.setLong(1, id);
+            try (ResultSet dong = lenh.executeQuery()) {
+                return dong.next();
+            }
+        }
+    }
+
     public NguoiDungModel timTheoSoDienThoai(long nguoiTim, String so) throws SQLException {
         String soGoc = so.startsWith("+") ? so.substring(1) : so;
         String soNoiDia = soGoc.matches("84[0-9]{9}") ? "0" + soGoc.substring(2) : soGoc;

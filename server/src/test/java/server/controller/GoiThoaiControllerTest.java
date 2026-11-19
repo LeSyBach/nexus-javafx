@@ -3,6 +3,7 @@ package server.controller;
 import giaothuc.DuLieu;
 import giaothuc.ThongDiep;
 import org.junit.jupiter.api.Test;
+import server.model.CuocGoiModel;
 import server.model.LoiNghiepVuModel;
 
 import java.net.InetAddress;
@@ -13,7 +14,9 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GoiThoaiControllerTest {
-    private final GoiThoaiController dieuKhien = new GoiThoaiController();
+    private final Object khoaChat = new Object();
+    private final List<CuocGoiModel> lichSu = new ArrayList<>();
+    private final GoiThoaiController dieuKhien = new GoiThoaiController(khoaChat, lichSu::add);
     private final List<ThongDiep> tinA = new ArrayList<>();
     private final List<ThongDiep> tinB = new ArrayList<>();
     private final Object phienA = new Object();
@@ -38,8 +41,12 @@ class GoiThoaiControllerTest {
 
         dieuKhien.ketThuc(id, new Object());
         assertEquals(1, tinA.size());
+        assertTrue(lichSu.isEmpty());
         dieuKhien.ketThuc(id, phienA);
+        dieuKhien.ketThuc(id, phienB);
         assertEquals("cuocGoiKetThuc", tinB.get(2).loai());
+        assertEquals(List.of(CuocGoiModel.KetQua.hoanTat), lichSu.stream().map(CuocGoiModel::ketQua).toList());
+        assertEquals(id, lichSu.get(0).id());
         moiGoi();
     }
 
@@ -54,6 +61,8 @@ class GoiThoaiControllerTest {
         dieuKhien.roi(phienA);
         assertEquals("Đối phương đã ngắt kết nối.", DuLieu.chu(tinB.get(3).duLieu(), "thongBao"));
         assertThrows(LoiNghiepVuModel.class, () -> dieuKhien.batMay(lanHai, phienB, 5101));
+        assertEquals(List.of(CuocGoiModel.KetQua.tuChoi, CuocGoiModel.KetQua.huy),
+                lichSu.stream().map(CuocGoiModel::ketQua).toList());
         moiGoi();
     }
 
@@ -64,6 +73,14 @@ class GoiThoaiControllerTest {
         dieuKhien.khiChan(2, 1);
         assertEquals("cuocGoiKetThuc", tinA.get(1).loai());
         assertEquals("cuocGoiKetThuc", tinB.get(2).loai());
+        assertEquals(CuocGoiModel.KetQua.gianDoan, lichSu.get(0).ketQua());
+    }
+
+    @Test
+    void nguoiNhanRoiTruocKhiBatMayThanhCuocGoiNho() throws Exception {
+        UUID id = moiGoi();
+        dieuKhien.roi(phienB);
+        assertEquals(List.of(new CuocGoiModel(id, 1, 2, CuocGoiModel.KetQua.nho, 0)), lichSu);
     }
 
     private UUID moiGoi() throws Exception {

@@ -2,6 +2,7 @@ package server.dao;
 
 import com.google.gson.*;
 import giaothuc.DuLieu;
+import server.model.CuocGoiModel;
 import server.model.KetQuaLuuModel;
 import server.model.LoiNghiepVuModel;
 
@@ -18,6 +19,55 @@ public final class TinNhanDao {
 
     static final String chonTin =
             "SELECT t.*,n.ten_hien_thi,p.ma_luu,p.ten_tep,p.kich_thuoc,p.sha256,p.loai_tep FROM tin_nhan t JOIN nguoi_dung n ON n.id=t.nguoi_gui_id LEFT JOIN tep_dinh_kem p ON p.tin_nhan_id=t.id ";
+
+    public boolean daLuuCuocGoi(long nguoiGoi, UUID id) throws SQLException {
+        try (Connection db = csdl.moKetNoi()) {
+            return timCuocGoi(db, nguoiGoi, id) != null;
+        }
+    }
+
+    public KetQuaLuuModel luuCuocGoi(CuocGoiModel cuocGoi) throws SQLException {
+        try (Connection db = csdl.moKetNoi()) {
+            JsonObject daLuu = timCuocGoi(db, cuocGoi.nguoiGoi(), cuocGoi.id());
+            if (daLuu != null) {
+                return new KetQuaLuuModel(daLuu, false);
+            }
+            String sql = """
+                    INSERT INTO tin_nhan(ma_gui,nguoi_gui_id,nguoi_nhan_id,noi_dung,bam_noi_dung,
+                        loai_tin,cuoc_goi_id,ket_qua_goi,thoi_luong_goi)
+                    VALUES(?,?,?,?,?,'cuoc_goi',?,?,?)
+                    """;
+            String noiDung = cuocGoi.noiDung();
+            try (PreparedStatement lenh = db.prepareStatement(sql)) {
+                lenh.setString(1, UUID.randomUUID().toString());
+                lenh.setLong(2, cuocGoi.nguoiGoi());
+                lenh.setLong(3, cuocGoi.nguoiNhan());
+                lenh.setString(4, noiDung);
+                lenh.setString(5, TuongTacTinNhanDao.bamChu(noiDung));
+                lenh.setString(6, cuocGoi.id().toString());
+                lenh.setString(7, cuocGoi.ketQua().name());
+                lenh.setLong(8, cuocGoi.soGiay());
+                lenh.executeUpdate();
+            } catch (SQLIntegrityConstraintViolationException loi) {
+                daLuu = timCuocGoi(db, cuocGoi.nguoiGoi(), cuocGoi.id());
+                if (daLuu != null) {
+                    return new KetQuaLuuModel(daLuu, false);
+                }
+                throw loi;
+            }
+            return new KetQuaLuuModel(timCuocGoi(db, cuocGoi.nguoiGoi(), cuocGoi.id()), true);
+        }
+    }
+
+    private JsonObject timCuocGoi(Connection db, long nguoiGoi, UUID id) throws SQLException {
+        try (PreparedStatement lenh = db.prepareStatement(chonTin + "WHERE t.nguoi_gui_id=? AND t.cuoc_goi_id=?")) {
+            lenh.setLong(1, nguoiGoi);
+            lenh.setString(2, id.toString());
+            try (ResultSet dong = lenh.executeQuery()) {
+                return dong.next() ? docTin(dong) : null;
+            }
+        }
+    }
 
     public KetQuaLuuModel luuTin(long nguoiGui, Long nguoiNhan, String maGui, String noiDung) throws SQLException {
         return luuTin(nguoiGui, nguoiNhan, maGui, noiDung, null);
@@ -359,7 +409,11 @@ public final class TinNhanDao {
     }
 
     static String loaiTinTuCSDL(String loaiTin) {
-        return "van_ban".equals(loaiTin) ? "vanBan" : loaiTin;
+        return switch (loaiTin) {
+            case "van_ban" -> "vanBan";
+            case "cuoc_goi" -> "cuocGoi";
+            default -> loaiTin;
+        };
     }
 
     static JsonObject docTin(ResultSet dong) throws SQLException {
@@ -379,6 +433,10 @@ public final class TinNhanDao {
         tin.addProperty("camXucCuaToi", "");
         if (daThuHoi) {
             tin.addProperty("noiDung", "Tin nhắn đã được thu hồi");
+        }
+        if (!daThuHoi && "cuocGoi".equals(DuLieu.chu(tin, "loaiTin"))) {
+            tin.addProperty("ketQuaGoi", dong.getString("ket_qua_goi"));
+            tin.addProperty("thoiLuongGoi", dong.getLong("thoi_luong_goi"));
         }
         if (!daThuHoi && dong.getString("ma_luu") != null) {
             tin.add("tep",

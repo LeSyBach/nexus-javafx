@@ -575,6 +575,51 @@ class MayChuChatTest {
                 "id"));
     }
 
+    @Test
+    @Order(20)
+    void lichSuCuocGoiChiHienChoHaiNguoiVaLuuKhiNgoaiTuyen() throws Exception {
+        MayThu a = cacMay.get(0), b = cacMay.get(1), c = cacMay.get(2);
+        String idA = cacId.get(0), idB = cacId.get(1);
+        String maGoi = UUID.randomUUID().toString();
+        JsonObject moi = DuLieu.tao("cuocGoiId", maGoi, "nguoiNhanId", idB, "port", "5100");
+        JsonObject dieuKhien = DuLieu.tao("cuocGoiId", maGoi, "port", "5101");
+        dung(a.gui("moiGoiThoai", moi));
+        dung(b.gui("batMayGoiThoai", dieuKhien));
+        dung(a.gui("ketThucGoiThoai", dieuKhien));
+        dung(b.gui("ketThucGoiThoai", dieuKhien));
+        JsonObject cuocGoi = lichSuGoi(b, idA).get(0);
+        assertEquals("hoanTat", DuLieu.chu(cuocGoi, "ketQuaGoi"));
+        assertTrue(cuocGoi.get("thoiLuongGoi").getAsLong() >= 0);
+        assertEquals(DuLieu.chu(cuocGoi, "id"), DuLieu.chu(lichSuGoi(a, idB).get(0), "id"));
+        assertTrue(a.daNhan(DuLieu.chu(cuocGoi, "maGui")));
+        assertTrue(b.daNhan(DuLieu.chu(cuocGoi, "maGui")));
+        assertFalse(c.daNhan(DuLieu.chu(cuocGoi, "maGui")));
+        assertEquals("cuocGoiDaKetThuc", DuLieu.chu(a.gui("moiGoiThoai", moi), "maLoi"));
+
+        dung(b.gui("dangXuat", new JsonObject()));
+        moi.addProperty("cuocGoiId", UUID.randomUUID().toString());
+        assertEquals("nguoiNhanNgoaiTuyen", DuLieu.chu(a.gui("moiGoiThoai", moi), "maLoi"));
+        dung(b.gui("dangNhap", DuLieu.tao("email", cacEmail.get(1), "matKhau", matKhau)));
+        List<JsonObject> daLuu = lichSuGoi(b, idA);
+        assertEquals(List.of("hoanTat", "nho"), daLuu.stream().map(tin -> DuLieu.chu(tin, "ketQuaGoi")).toList());
+        dung(b.gui("xoaTin", DuLieu.tao("tinNhanId", DuLieu.chu(daLuu.get(1), "id"))));
+        assertEquals(1, lichSuGoi(b, idA).size());
+        assertEquals(2, lichSuGoi(a, idB).size());
+    }
+
+    private List<JsonObject> lichSuGoi(MayThu may, String doiPhuong) throws IOException {
+        JsonObject phanHoi = may.gui("lichSu", DuLieu.tao("nguoiNhanId", doiPhuong));
+        dung(phanHoi);
+        List<JsonObject> lichSu = new ArrayList<>();
+        for (JsonElement phanTu : phanHoi.getAsJsonArray("tinNhan")) {
+            JsonObject tin = phanTu.getAsJsonObject();
+            if ("cuocGoi".equals(DuLieu.chu(tin, "loaiTin"))) {
+                lichSu.add(tin);
+            }
+        }
+        return lichSu;
+    }
+
     @AfterAll
     void don() throws Exception {
         for (MayThu may : cacMay) {

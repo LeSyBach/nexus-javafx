@@ -205,6 +205,10 @@ Bấm tên ở đầu chat để mở bảng thông tin bên phải. Kho ảnh, 
 
 Hộp Tạo nhóm có thể chọn ảnh và lọc bạn bè. Khi chuyển máy, áp dụng thêm migration `014_anh_nhom.sql`. Mục Bạn bè nhận email hoặc số điện thoại. Người lạ chỉ tìm bằng số được khi chủ tài khoản đặt quyền xem số điện thoại là Mọi người.
 
+### Lịch sử cuộc gọi thoại
+
+Nhập `015_lich_su_cuoc_goi.sql` sau migration 014 bằng tài khoản quản trị trong phpMyAdmin, rồi khởi động lại server và client. Các cuộc gọi mới xuất hiện trực tiếp trong chat riêng, kèm kết quả và nút Gọi lại. Server ghi thời lượng từ khi người nhận bắt máy. Lời mời hết hạn hoặc cuộc gọi tới tài khoản ngoại tuyến được lưu là Cuộc gọi nhỡ. Chuột phải vào mục cuộc gọi để xóa ở phía mình.
+
 ### Cấu trúc MVC
 
 - `client/src/main/java/client/view`, `client/src/main/java/client/controller`, `client/src/main/java/client/model` chứa mã JavaFX, điều khiển và dữ liệu máy khách. Ví dụ `TaoNhomView.java`, `NhomController.java` và `TaiKhoanModel.java`.

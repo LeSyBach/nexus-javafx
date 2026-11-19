@@ -1,6 +1,7 @@
 package client.controller;
 
 import client.hatang.AmThanhUDP;
+import client.hatang.ChuongGoiDen;
 import client.hatang.KenhTCP;
 import com.google.gson.JsonObject;
 import giaothuc.DuLieu;
@@ -20,6 +21,7 @@ public final class GoiThoaiController {
     private final KenhTCP kenh;
     private final Executor luongGiaoDien;
     private final Consumer<HienThi> capNhat;
+    private final ChuongGoiDen chuongGoiDen = new ChuongGoiDen();
     private UUID cuocGoiId;
     private String ten = "";
     private TrangThai trangThai = TrangThai.ranh;
@@ -171,6 +173,11 @@ public final class GoiThoaiController {
     }
 
     private void hien(String thongBao) {
+        if (trangThai == TrangThai.cuocGoiDen) {
+            chuongGoiDen.bat();
+        } else {
+            chuongGoiDen.tat();
+        }
         capNhat.accept(new HienThi(trangThai, thongBao == null ? "Cuộc gọi bị gián đoạn." : thongBao, tatMic));
     }
 }

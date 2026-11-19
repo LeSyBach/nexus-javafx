@@ -1,5 +1,7 @@
 package client.view;
 
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import client.controller.BanBeController;
 import client.controller.GoiThoaiController;
 import client.controller.HoiThoaiController;
@@ -30,7 +32,7 @@ public final class HoiThoaiView extends BorderPane {
     private final GoiThoaiController dieuKhienGoiThoai;
     private final GoiThoaiView thanhGoiThoai = new GoiThoaiView();
     private final Button nutGoiThoai = DoHoaView.nut("Gọi thoại", "nutHoSoPhu");
-    private boolean dangCoCuocGoi;
+    private final BooleanProperty dangCoCuocGoi = new SimpleBooleanProperty();
     private final DanhSachHoiThoaiModel danhSachModel = new DanhSachHoiThoaiModel();
     private final LichSuTinNhanModel lichSuModel = new LichSuTinNhanModel();
     private final TaiKhoanController dieuKhienTaiKhoan;
@@ -468,6 +470,7 @@ public final class HoiThoaiView extends BorderPane {
         HBox.setHgrow(khoang, Priority.ALWAYS);
         nutGoiThoai.setId("goiThoai");
         nutGoiThoai.setOnAction(e -> dieuKhienGoiThoai.goi(doiPhuong, tieuDe.getText()));
+        nutGoiThoai.disableProperty().bind(dangCoCuocGoi);
         nutGoiThoai.managedProperty().bind(nutGoiThoai.visibleProperty());
         capNhatNutGoiThoai();
         dau.getChildren().addAll(thongTin, khoang, nutGoiThoai);
@@ -475,14 +478,13 @@ public final class HoiThoaiView extends BorderPane {
     }
 
     private void capNhatGoiThoai(GoiThoaiController.HienThi duLieu) {
-        dangCoCuocGoi = duLieu.trangThai() != GoiThoaiController.TrangThai.ranh;
+        dangCoCuocGoi.set(duLieu.trangThai() != GoiThoaiController.TrangThai.ranh);
         capNhatNutGoiThoai();
         thanhGoiThoai.capNhat(duLieu);
     }
 
     private void capNhatNutGoiThoai() {
         nutGoiThoai.setVisible(doiPhuong != null);
-        nutGoiThoai.setDisable(dangCoCuocGoi);
     }
 
     private VBox vungSoan() {
@@ -847,9 +849,16 @@ public final class HoiThoaiView extends BorderPane {
             JsonObject tin = tinDaLuu.deepCopy();
             tin.addProperty("daXem", daXem);
             boolean cuaMinh = DuLieu.chu(tin, "nguoiGuiId").equals(idCuaMinh);
-            BongTinNhanView nhom =
-                    new BongTinNhanView(tin, idCuaMinh, this::chonTraLoi, this::thaoTacTin,
-                            this::taiTep, dieuKhienAnh);
+            VBox nhom;
+            if ("cuocGoi".equals(DuLieu.chu(tin, "loaiTin")) && !LichSuTinNhanModel.daThuHoi(tin)) {
+                String idNguoiGoiLai = doiPhuong;
+                String tenNguoiGoiLai = tieuDe.getText();
+                nhom = new LichSuGoiView(tin, cuaMinh, dangCoCuocGoi,
+                        () -> dieuKhienGoiThoai.goi(idNguoiGoiLai, tenNguoiGoiLai), this::thaoTacTin);
+            } else {
+                nhom = new BongTinNhanView(tin, idCuaMinh, this::chonTraLoi, this::thaoTacTin,
+                        this::taiTep, dieuKhienAnh);
+            }
             HBox hang = new HBox(9);
             hang.setAlignment(cuaMinh ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
             if (!cuaMinh) {

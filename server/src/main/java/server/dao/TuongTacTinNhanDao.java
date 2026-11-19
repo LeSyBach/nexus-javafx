@@ -86,12 +86,16 @@ public final class TuongTacTinNhanDao {
             db.setAutoCommit(false);
             try {
                 try (PreparedStatement tim = db.prepareStatement(
-                        "SELECT nguoi_gui_id,da_thu_hoi FROM tin_nhan WHERE id=? FOR UPDATE")) {
+                        "SELECT nguoi_gui_id,da_thu_hoi,loai_tin FROM tin_nhan WHERE id=? FOR UPDATE")) {
                     tim.setLong(1, tinId);
                     try (ResultSet dong = tim.executeQuery()) {
                         if (!dong.next() || dong.getLong("nguoi_gui_id") != nguoi) {
                             throw new LoiNghiepVuModel("khongDuocThuHoi",
                                     "Bạn chỉ được thu hồi tin do mình gửi.");
+                        }
+                        if ("cuoc_goi".equals(dong.getString("loai_tin"))) {
+                            throw new LoiNghiepVuModel("khongTheThuHoiCuocGoi",
+                                    "Chỉ có thể xóa mục cuộc gọi ở phía bạn.");
                         }
                         if (dong.getBoolean("da_thu_hoi")) {
                             db.commit();

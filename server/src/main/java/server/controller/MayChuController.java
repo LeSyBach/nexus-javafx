@@ -1,5 +1,6 @@
 package server.controller;
 
+import server.model.CuocGoiModel;
 import server.model.KetQuaLuuModel;
 import server.hatang.BaoMat;
 import server.hatang.BoNhanTep;
@@ -22,9 +23,12 @@ import giaothuc.*;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.Path;
+import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Điều phối yêu cầu và sự kiện, độc lập với cách đọc/ghi socket.
@@ -39,7 +43,8 @@ public final class MayChuController {
     private final PhienDao khoPhien;
     private final TepModel khoTep;
     private final TuongTacTinNhanDao khoTuongTac;
-    private final GoiThoaiController goiThoai = new GoiThoaiController();
+    private final GoiThoaiController goiThoai;
+    private final Set<UUID> cuocGoiChoLuu = new HashSet<>();
     private final Set<Phien> cacClient = ConcurrentHashMap.newKeySet();
     private final Map<String, long[]> luotDangNhapTheoIP = new HashMap<>();
 
@@ -49,6 +54,7 @@ public final class MayChuController {
         thongTinChatDao = new ThongTinChatDao(csdl);
         khoTep = new TepModel(csdl, thuMucTep);
         khoTuongTac = new TuongTacTinNhanDao(csdl);
+        goiThoai = new GoiThoaiController(khoTuongTac, this::luuLichSuGoiSauKetThuc);
         khoNhom = new NhomChatDao(csdl);
         khoBanBe = new BanBeDao(csdl);
         khoHoSo = new HoSoModel(csdl);
@@ -73,7 +79,7 @@ public final class MayChuController {
         boolean daVao = phien.nguoiDung != null;
         phien.nguoiDung = null;
         cacClient.remove(phien);
-        goiThoai.roi(phien);
+        roiCuocGoi(phien);
         phien.boNhanTep.close();
         if (daVao && mayChuDangChay) {
             phatDanhSach();
@@ -89,6 +95,41 @@ public final class MayChuController {
             NguoiDungModel nguoi = client.nguoiDung;
             if (nguoi != null && (nguoiNhan == null || nguoi.id() == nguoiGui || nguoi.id() == nguoiNhan)) {
                 client.gui(suKien);
+            }
+        }
+    }
+
+    private void roiCuocGoi(Phien phien) {
+        synchronized (khoTuongTac) {
+            goiThoai.roi(phien);
+        }
+    }
+
+    private void luuLichSuGoi(CuocGoiModel cuocGoi) throws SQLException {
+        KetQuaLuuModel ketQua = tinNhanDao.luuCuocGoi(cuocGoi);
+        if (ketQua.taoMoi()) {
+            phatTin(ketQua.tinNhan(), cuocGoi.nguoiNhan(), cuocGoi.nguoiGoi());
+        }
+    }
+
+    private void luuLichSuGoiSauKetThuc(CuocGoiModel cuocGoi) {
+        cuocGoiChoLuu.add(cuocGoi.id());
+        thuLuuLichSuGoi(cuocGoi, 3);
+    }
+
+    private void thuLuuLichSuGoi(CuocGoiModel cuocGoi, int soLanConLai) {
+        synchronized (khoTuongTac) {
+            try {
+                luuLichSuGoi(cuocGoi);
+                cuocGoiChoLuu.remove(cuocGoi.id());
+            } catch (SQLException loi) {
+                if (soLanConLai > 1 && !(loi instanceof SQLIntegrityConstraintViolationException)) {
+                    CompletableFuture.delayedExecutor(2, TimeUnit.SECONDS)
+                            .execute(() -> thuLuuLichSuGoi(cuocGoi, soLanConLai - 1));
+                } else {
+                    cuocGoiChoLuu.remove(cuocGoi.id());
+                    System.err.println("Chưa lưu được lịch sử cuộc gọi " + cuocGoi.id() + ": " + loi.getSQLState());
+                }
             }
         }
     }
@@ -298,7 +339,7 @@ public final class MayChuController {
                                     !Objects.equals(client.bamPhien, bamPhien)) {
                                 client.nguoiDung = null;
                                 client.bamPhien = null;
-                                goiThoai.roi(client);
+                                roiCuocGoi(client);
                                 client.boNhanTep.close();
                                 client.gui(ThongDiep.suKien("phienBiHuy", DuLieu.tao("thongBao",
                                         "Mật khẩu đã được thay đổi. Hãy đăng nhập lại.")));
@@ -605,6 +646,10 @@ public final class MayChuController {
                                 throw new LoiNghiepVuModel("tinKhongCon", "Tin nhắn đã bị xóa ở phía bạn.");
                             }
                             JsonObject goc = khoTuongTac.doc(tinId, nguoiDung.id());
+                            if ("cuocGoi".equals(DuLieu.chu(goc, "loaiTin"))) {
+                                throw new LoiNghiepVuModel("khongTheChuyenCuocGoi",
+                                        "Không thể chuyển tiếp lịch sử cuộc gọi.");
+                            }
                             if (goc.get("daThuHoi").getAsBoolean()) {
                                 throw new LoiNghiepVuModel("tinDaThuHoi", "Tin gốc đã được thu hồi.");
                             }
@@ -640,7 +685,7 @@ public final class MayChuController {
                         boNhanTep.close();
                         bamPhien = null;
                         nguoiDung = null;
-                        goiThoai.roi(this);
+                        roiCuocGoi(this);
                         thanhCong(yeuCau, new JsonObject());
                         phatDanhSach();
                     }
@@ -661,41 +706,51 @@ public final class MayChuController {
         }
 
         private void xuLyGoiThoai(ThongDiep yeuCau, JsonObject duLieu) throws SQLException, IOException {
-            canDangNhap();
             UUID id = UUID.fromString(DuLieu.chu(duLieu, "cuocGoiId"));
-            switch (yeuCau.loai()) {
-                case "moiGoiThoai" -> {
-                    long nguoiNhan = DuLieu.id(duLieu, "nguoiNhanId", false);
-                    int port = docPortThoai(duLieu);
-                    NguoiDungModel nguoiGoi = nguoiDung;
-                    if (nguoiGoi == null || nguoiGoi.id() == nguoiNhan) {
-                        throw new IllegalArgumentException();
-                    }
-                    synchronized (khoTuongTac) {
-                        if (tinNhanDao.daChan(nguoiGoi.id(), nguoiNhan)
-                                || tinNhanDao.daChan(nguoiNhan, nguoiGoi.id())) {
-                            throw new LoiNghiepVuModel("khongTheGoiThoai", "Không thể gọi người này.");
+            synchronized (khoTuongTac) {
+                canDangNhap();
+                switch (yeuCau.loai()) {
+                    case "moiGoiThoai" -> {
+                        long nguoiNhan = DuLieu.id(duLieu, "nguoiNhanId", false);
+                        int port = docPortThoai(duLieu);
+                        NguoiDungModel nguoiGoi = nguoiDung;
+                        if (nguoiGoi == null || nguoiGoi.id() == nguoiNhan) {
+                            throw new IllegalArgumentException();
                         }
-                        synchronized (goiThoai) {
-                            for (Phien client : cacClient) {
-                                NguoiDungModel dich = client.nguoiDung;
-                                if (dich != null && dich.id() == nguoiNhan
-                                        && khoPhien.conHieuLuc(client.bamPhien, dich.id())
-                                        && client.nguoiDung == dich && nguoiDung == nguoiGoi) {
-                                    goiThoai.moi(id, dauGoi(nguoiGoi), client.dauGoi(dich), port);
-                                    thanhCong(yeuCau, new JsonObject());
-                                    return;
-                                }
-                            }
-                        }
+                        moiCuocGoi(id, nguoiGoi, nguoiNhan, port);
                     }
-                    throw new LoiNghiepVuModel("nguoiNhanNgoaiTuyen", "Người nhận đang ngoại tuyến.");
+                    case "batMayGoiThoai" -> goiThoai.batMay(id, this, docPortThoai(duLieu));
+                    case "ketThucGoiThoai" -> goiThoai.ketThuc(id, this);
+                    default -> throw new IllegalArgumentException();
                 }
-                case "batMayGoiThoai" -> goiThoai.batMay(id, this, docPortThoai(duLieu));
-                case "ketThucGoiThoai" -> goiThoai.ketThuc(id, this);
-                default -> throw new IllegalArgumentException();
             }
             thanhCong(yeuCau, new JsonObject());
+        }
+
+        private void moiCuocGoi(UUID id, NguoiDungModel nguoiGoi, long nguoiNhan, int port)
+                throws SQLException, IOException {
+            if (tinNhanDao.daChan(nguoiGoi.id(), nguoiNhan) || tinNhanDao.daChan(nguoiNhan, nguoiGoi.id())) {
+                throw new LoiNghiepVuModel("khongTheGoiThoai", "Không thể gọi người này.");
+            }
+            if (cuocGoiChoLuu.contains(id) || tinNhanDao.daLuuCuocGoi(nguoiGoi.id(), id)) {
+                throw new LoiNghiepVuModel("cuocGoiDaKetThuc", "Cuộc gọi này đã kết thúc.");
+            }
+            for (Phien client : cacClient) {
+                NguoiDungModel dich = client.nguoiDung;
+                if (dich != null && dich.id() == nguoiNhan && khoPhien.conHieuLuc(client.bamPhien, dich.id())
+                        && client.nguoiDung == dich && nguoiDung == nguoiGoi) {
+                    goiThoai.moi(id, dauGoi(nguoiGoi), client.dauGoi(dich), port);
+                    return;
+                }
+            }
+            if (goiThoai.dangGoi(nguoiGoi.id())) {
+                throw new LoiNghiepVuModel("cuocGoiBan", "Bạn đang có cuộc gọi.");
+            }
+            if (!nguoiDungDao.tonTai(nguoiNhan) || nguoiDung != nguoiGoi) {
+                throw new LoiNghiepVuModel("khongTheGoiThoai", "Không thể gọi người này.");
+            }
+            luuLichSuGoi(new CuocGoiModel(id, nguoiGoi.id(), nguoiNhan, CuocGoiModel.KetQua.nho, 0));
+            throw new LoiNghiepVuModel("nguoiNhanNgoaiTuyen", "Người nhận đang ngoại tuyến. Đã lưu cuộc gọi nhỡ.");
         }
 
         private GoiThoaiController.DauGoi dauGoi(NguoiDungModel nguoi) throws IOException {
