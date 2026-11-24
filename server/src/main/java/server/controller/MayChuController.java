@@ -717,9 +717,9 @@ public final class MayChuController {
                         if (nguoiGoi == null || nguoiGoi.id() == nguoiNhan) {
                             throw new IllegalArgumentException();
                         }
-                        moiCuocGoi(id, nguoiGoi, nguoiNhan, port);
+                        moiCuocGoi(id, nguoiGoi, nguoiNhan, port, docPortVideo(duLieu));
                     }
-                    case "batMayGoiThoai" -> goiThoai.batMay(id, this, docPortThoai(duLieu));
+                    case "batMayGoiThoai" -> goiThoai.batMay(id, this, docPortThoai(duLieu), docPortVideo(duLieu));
                     case "ketThucGoiThoai" -> goiThoai.ketThuc(id, this);
                     default -> throw new IllegalArgumentException();
                 }
@@ -727,7 +727,7 @@ public final class MayChuController {
             thanhCong(yeuCau, new JsonObject());
         }
 
-        private void moiCuocGoi(UUID id, NguoiDungModel nguoiGoi, long nguoiNhan, int port)
+        private void moiCuocGoi(UUID id, NguoiDungModel nguoiGoi, long nguoiNhan, int port, int videoPort)
                 throws SQLException, IOException {
             if (tinNhanDao.daChan(nguoiGoi.id(), nguoiNhan) || tinNhanDao.daChan(nguoiNhan, nguoiGoi.id())) {
                 throw new LoiNghiepVuModel("khongTheGoiThoai", "Không thể gọi người này.");
@@ -739,7 +739,7 @@ public final class MayChuController {
                 NguoiDungModel dich = client.nguoiDung;
                 if (dich != null && dich.id() == nguoiNhan && khoPhien.conHieuLuc(client.bamPhien, dich.id())
                         && client.nguoiDung == dich && nguoiDung == nguoiGoi) {
-                    goiThoai.moi(id, dauGoi(nguoiGoi), client.dauGoi(dich), port);
+                    goiThoai.moi(id, dauGoi(nguoiGoi), client.dauGoi(dich), port, videoPort);
                     return;
                 }
             }
@@ -749,7 +749,7 @@ public final class MayChuController {
             if (!nguoiDungDao.tonTai(nguoiNhan) || nguoiDung != nguoiGoi) {
                 throw new LoiNghiepVuModel("khongTheGoiThoai", "Không thể gọi người này.");
             }
-            luuLichSuGoi(new CuocGoiModel(id, nguoiGoi.id(), nguoiNhan, CuocGoiModel.KetQua.nho, 0));
+            luuLichSuGoi(new CuocGoiModel(id, nguoiGoi.id(), nguoiNhan, CuocGoiModel.KetQua.nho, 0, videoPort != 0));
             throw new LoiNghiepVuModel("nguoiNhanNgoaiTuyen", "Người nhận đang ngoại tuyến. Đã lưu cuộc gọi nhỡ.");
         }
 
@@ -761,6 +761,14 @@ public final class MayChuController {
         private int docPortThoai(JsonObject duLieu) {
             int port = Integer.parseInt(DuLieu.chu(duLieu, "port"));
             if (port < 1 || port > 65535) {
+                throw new IllegalArgumentException();
+            }
+            return port;
+        }
+
+        private int docPortVideo(JsonObject duLieu) {
+            int port = duLieu.has("videoPort") ? duLieu.get("videoPort").getAsInt() : 0;
+            if (port < 0 || port > 65535) {
                 throw new IllegalArgumentException();
             }
             return port;

@@ -209,6 +209,14 @@ Hộp Tạo nhóm có thể chọn ảnh và lọc bạn bè. Khi chuyển máy,
 
 Nhập `015_lich_su_cuoc_goi.sql` sau migration 014 bằng tài khoản quản trị trong phpMyAdmin, rồi khởi động lại server và client. Các cuộc gọi mới xuất hiện trực tiếp trong chat riêng, kèm kết quả và nút Gọi lại. Server ghi thời lượng từ khi người nhận bắt máy. Lời mời hết hạn hoặc cuộc gọi tới tài khoản ngoại tuyến được lưu là Cuộc gọi nhỡ. Chuột phải vào mục cuộc gọi để xóa ở phía mình.
 
+### Gọi video 1–1 trong LAN
+
+Áp dụng migration `016_goi_video.sql` sau 015, biên dịch và khởi động lại server cùng hai client. Mở chat riêng, chọn **Gọi video**. Người nhận thấy rõ lời mời video, có thể tắt camera trước khi bắt máy. Camera chỉ được mở sau khi lời mời được chấp nhận. Nút camera đóng thiết bị khi tắt và mở lại khi bật. Khung nhỏ hiển thị hình của mình, khung chính hiển thị đối phương.
+
+Client dùng webcam-capture 0.3.12 để truy cập camera. Phần chia JPEG 320×240 thành gói, truyền bằng DatagramSocket, kiểm tra token phiên, ghép gói đến lệch thứ tự và bỏ khung cũ nằm ở `KhungHinhUDP` và `VideoUDP`. Tốc độ gửi mục tiêu khoảng 12 khung/giây, âm thanh chạy trên socket UDP riêng. Khi camera không sẵn sàng, cửa sổ báo lỗi và vẫn giữ âm thanh. TCP trao đổi cổng video sau khi bắt máy. Lịch sử lưu loại cuộc gọi để nút Gọi lại chọn đúng thoại hoặc video.
+
+Đây là bản truyền JPEG qua UDP cho LAN. Chất lượng cần kiểm tra trên hai máy thật, chưa có codec video thích nghi hoặc kết nối qua NAT cho hai mạng Internet khác nhau.
+
 ### Cấu trúc MVC
 
 - `client/src/main/java/client/view`, `client/src/main/java/client/controller`, `client/src/main/java/client/model` chứa mã JavaFX, điều khiển và dữ liệu máy khách. Ví dụ `TaoNhomView.java`, `NhomController.java` và `TaiKhoanModel.java`.

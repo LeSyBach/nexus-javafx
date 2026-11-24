@@ -264,3 +264,33 @@
 .nhanNhomBan { -fx-font-weight: bold; -fx-text-fill: #234738; -fx-padding: 8 0 5; }
 .chonBanTaoNhom .box { -fx-background-radius: 20; -fx-border-radius: 20; }
 .chonBanTaoNhom .label { -fx-font-size: 14px; }
+
+.cuaSoGoiThoai {
+    -fx-background-color: radial-gradient(center 50% 38%, radius 80%, #28594f, #152e2a 65%, #10231f);
+}
+.cuaSoGoiThoai .thuongHieuCuocGoi { -fx-text-fill: #b6d3c4; -fx-font-size: 21; -fx-font-weight: bold; }
+.cuaSoGoiThoai .tenNguoiGoi { -fx-text-fill: #f5faf7; -fx-font-size: 26; -fx-font-weight: bold; -fx-text-alignment: center; }
+.cuaSoGoiThoai .trangThaiCuocGoi { -fx-text-fill: #c0d7ce; -fx-font-size: 14; -fx-text-alignment: center; }
+.cuaSoGoiThoai .dongHoCuocGoi { -fx-text-fill: #bcf4d8; -fx-font-size: 15; -fx-font-weight: bold; -fx-background-color: #274a40; -fx-background-radius: 20; -fx-padding: 7 14; }
+.vongAnhCuocGoi { -fx-background-color: rgba(156, 215, 187, 0.10); -fx-background-radius: 100; -fx-border-color: rgba(184, 232, 207, 0.28); -fx-border-width: 1; -fx-border-radius: 100; -fx-padding: 14; }
+.anhCuocGoi { -fx-background-color: linear-gradient(to bottom right, #719c84, #386351); -fx-background-radius: 100; -fx-border-radius: 100; -fx-border-width: 2; -fx-border-color: #9bc4aa; }
+.anhCuocGoi .label { -fx-text-fill: #f8fffa; -fx-font-size: 38; -fx-font-weight: bold; }
+.thaoTacCuocGoi { -fx-padding: 28 24 32; -fx-background-color: rgba(8, 22, 18, 0.35); }
+.cuaSoGoiThoai .nhanNutGoi { -fx-text-fill: #e4efe9; -fx-font-size: 12; }
+.nutTronCuocGoi { -fx-min-width: 60; -fx-pref-width: 60; -fx-max-width: 60; -fx-min-height: 60; -fx-pref-height: 60; -fx-max-height: 60; -fx-background-radius: 50; -fx-border-radius: 50; -fx-border-width: 2; -fx-border-color: transparent; -fx-padding: 16; }
+.nutTronCuocGoi .netBieuTuong { -fx-stroke: #f6fff9; -fx-stroke-width: 2; -fx-fill: transparent; }
+.nutMicGoi { -fx-background-color: #34534a; }
+.nutMicGoi:hover { -fx-background-color: #476a5e; }
+.nutMicGoi:micTat { -fx-background-color: #755542; }
+.nutCupMay { -fx-background-color: #d84d53; }
+.nutCupMay:hover { -fx-background-color: #ec6066; }
+.nutBatMay { -fx-background-color: #278963; }
+.nutBatMay:hover { -fx-background-color: #34a679; }
+.nutTronCuocGoi:focused { -fx-border-color: #c6f4d7; }
+.nutTronCuocGoi:pressed { -fx-opacity: 0.78; }
+.nutTronCuocGoi:disabled { -fx-opacity: 0.45; }
+.nutDongCuocGoi { -fx-background-color: #34534a; -fx-text-fill: #f2faf5; -fx-padding: 13 30; }
+.nutDongCuocGoi:hover { -fx-background-color: #476a5e; }
+.nutDongCuocGoi:focused { -fx-border-color: #c6f4d7; }
+.xemTruocVideo { -fx-background-color: #10231f; -fx-background-radius: 14; -fx-padding: 9; -fx-border-color: #638b77; -fx-border-radius: 14; }
+.cuaSoGoiThoai .loiVideo { -fx-text-fill: #f2d3a1; -fx-padding: 10 20 0; -fx-font-size: 12; }

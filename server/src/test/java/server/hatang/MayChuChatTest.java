@@ -620,6 +620,24 @@ class MayChuChatTest {
         return lichSu;
     }
 
+    @Test
+    @Order(21)
+    void videoQuaTCPVaLichSuGiuDungLoaiGoi() throws Exception {
+        MayThu a = cacMay.get(0), b = cacMay.get(1);
+        String id = UUID.randomUUID().toString();
+        dung(a.gui("moiGoiThoai",
+                DuLieu.tao("cuocGoiId", id, "nguoiNhanId", cacId.get(1), "port", "5100", "videoPort", 6100)));
+        dung(b.gui("batMayGoiThoai", DuLieu.tao("cuocGoiId", id, "port", "5101", "videoPort", 6101)));
+        dung(a.gui("ketThucGoiThoai", DuLieu.tao("cuocGoiId", id)));
+        List<JsonObject> lichSu = lichSuGoi(b, cacId.get(0));
+        JsonObject cuoi = lichSu.get(lichSu.size() - 1);
+        assertTrue(cuoi.get("goiVideo").getAsBoolean());
+        assertTrue(DuLieu.chu(cuoi, "noiDung").startsWith("Cuộc gọi video"));
+        assertTrue(a.suKien.stream().anyMatch(tin -> tin.loai().equals("cuocGoiBatDau")
+                && DuLieu.chu(tin.duLieu(), "cuocGoiId").equals(id)
+                && tin.duLieu().get("videoPort").getAsInt() == 6101));
+    }
+
     @AfterAll
     void don() throws Exception {
         for (MayThu may : cacMay) {

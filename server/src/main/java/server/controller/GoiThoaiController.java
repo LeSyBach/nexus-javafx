@@ -23,7 +23,8 @@ final class GoiThoaiController {
         }
     }
 
-    private record CuocGoi(UUID id, DauGoi nguoiGoi, DauGoi nguoiNhan, int portNguoiGoi, Long lucBatMay) {
+    private record CuocGoi(UUID id, DauGoi nguoiGoi, DauGoi nguoiNhan, int portNguoiGoi,
+                          int videoPortNguoiGoi, Long lucBatMay) {
         boolean daBatMay() {
             return lucBatMay != null;
         }
@@ -44,6 +45,10 @@ final class GoiThoaiController {
 
     // Các thao tác dùng cùng khóa với lịch sử và tin nhắn riêng ở MayChuController.
     void moi(UUID id, DauGoi nguoiGoi, DauGoi nguoiNhan, int portNguoiGoi) {
+        moi(id, nguoiGoi, nguoiNhan, portNguoiGoi, 0);
+    }
+
+    void moi(UUID id, DauGoi nguoiGoi, DauGoi nguoiNhan, int portNguoiGoi, int videoPortNguoiGoi) {
         if (nguoiGoi.id() == nguoiNhan.id() || !trongLan(nguoiGoi.ip()) || !trongLan(nguoiNhan.ip())
                 || nguoiGoi.ip().isLoopbackAddress() != nguoiNhan.ip().isLoopbackAddress()
                 || nguoiGoi.ip().getClass() != nguoiNhan.ip().getClass()) {
@@ -54,25 +59,34 @@ final class GoiThoaiController {
             throw new LoiNghiepVuModel("cuocGoiBan", "Một trong hai người đang có cuộc gọi.");
         }
 
-        CuocGoi cuocGoi = new CuocGoi(id, nguoiGoi, nguoiNhan, portNguoiGoi, null);
+        CuocGoi cuocGoi = new CuocGoi(id, nguoiGoi, nguoiNhan, portNguoiGoi, videoPortNguoiGoi, null);
         cacCuocGoi.put(id, cuocGoi);
         CompletableFuture.delayedExecutor(30, TimeUnit.SECONDS).execute(() -> hetHan(cuocGoi));
-        nguoiNhan.bao("cuocGoiDen", "cuocGoiId", id.toString(), "ten", nguoiGoi.ten());
+        nguoiNhan.bao("cuocGoiDen", "cuocGoiId", id.toString(), "ten", nguoiGoi.ten(),
+                "goiVideo", videoPortNguoiGoi != 0);
     }
 
     void batMay(UUID id, Object phien, int portNguoiNhan) {
+        batMay(id, phien, portNguoiNhan, 0);
+    }
+
+    void batMay(UUID id, Object phien, int portNguoiNhan, int videoPortNguoiNhan) {
         CuocGoi cuocGoi = cacCuocGoi.get(id);
         if (cuocGoi == null || cuocGoi.nguoiNhan().phien() != phien || cuocGoi.daBatMay()) {
             throw new LoiNghiepVuModel("cuocGoiHetHan", "Lời mời gọi đã kết thúc.");
         }
+        if ((cuocGoi.videoPortNguoiGoi() != 0) != (videoPortNguoiNhan != 0)) {
+            throw new LoiNghiepVuModel("clientChuaHoTroVideo", "Hai máy cần cập nhật cùng bản client để gọi video.");
+        }
         DauGoi nguoiGoi = cuocGoi.nguoiGoi();
         DauGoi nguoiNhan = cuocGoi.nguoiNhan();
         UUID mediaToken = UUID.randomUUID();
-        CuocGoi dangGoi = new CuocGoi(id, nguoiGoi, nguoiNhan, cuocGoi.portNguoiGoi(), System.nanoTime());
+        CuocGoi dangGoi = new CuocGoi(id, nguoiGoi, nguoiNhan, cuocGoi.portNguoiGoi(),
+                cuocGoi.videoPortNguoiGoi(), System.nanoTime());
         cacCuocGoi.put(id, dangGoi);
-        baoBatDau(id, mediaToken, nguoiGoi, nguoiNhan.ip(), portNguoiNhan);
+        baoBatDau(id, mediaToken, nguoiGoi, nguoiNhan.ip(), portNguoiNhan, videoPortNguoiNhan);
         if (cacCuocGoi.get(id) == dangGoi) {
-            baoBatDau(id, mediaToken, nguoiNhan, nguoiGoi.ip(), cuocGoi.portNguoiGoi());
+            baoBatDau(id, mediaToken, nguoiNhan, nguoiGoi.ip(), cuocGoi.portNguoiGoi(), cuocGoi.videoPortNguoiGoi());
         }
     }
 
@@ -131,7 +145,8 @@ final class GoiThoaiController {
         cacCuocGoi.remove(cuocGoi.id());
         long soGiay = cuocGoi.daBatMay()
                 ? TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - cuocGoi.lucBatMay()) : 0;
-        return new CuocGoiModel(cuocGoi.id(), cuocGoi.nguoiGoi().id(), cuocGoi.nguoiNhan().id(), ketQua, soGiay);
+        return new CuocGoiModel(cuocGoi.id(), cuocGoi.nguoiGoi().id(), cuocGoi.nguoiNhan().id(),
+                ketQua, soGiay, cuocGoi.videoPortNguoiGoi() != 0);
     }
 
     boolean dangGoi(long id) {
@@ -147,9 +162,9 @@ final class GoiThoaiController {
         return Objects.nonNull(ip) && (ip.isLoopbackAddress() || ip.isSiteLocalAddress());
     }
 
-    private static void baoBatDau(UUID id, UUID mediaToken, DauGoi dich, InetAddress ip, int port) {
+    private static void baoBatDau(UUID id, UUID mediaToken, DauGoi dich, InetAddress ip, int port, int videoPort) {
         dich.bao("cuocGoiBatDau", "cuocGoiId", id.toString(), "host", ip.getHostAddress(),
-                "port", port, "mediaToken", mediaToken.toString());
+                "port", port, "videoPort", videoPort, "mediaToken", mediaToken.toString());
     }
 
     private static void baoKetThuc(DauGoi dich, UUID id, String thongBao) {

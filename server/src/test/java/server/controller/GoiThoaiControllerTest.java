@@ -92,4 +92,23 @@ class GoiThoaiControllerTest {
         dieuKhien.moi(id, a, b, 5100);
         return id;
     }
+
+    @Test
+    void videoDoiPortSauKhiBatMayVaLuuDungLoai() throws Exception {
+        UUID id = UUID.randomUUID();
+        var a = new GoiThoaiController.DauGoi(phienA, 1, "A",
+                InetAddress.getByName("192.168.1.10"), tinA::add);
+        var b = new GoiThoaiController.DauGoi(phienB, 2, "B",
+                InetAddress.getByName("192.168.1.11"), tinB::add);
+        dieuKhien.moi(id, a, b, 5100, 6100);
+        assertTrue(tinB.get(0).duLieu().get("goiVideo").getAsBoolean());
+        assertFalse(tinB.get(0).duLieu().has("videoPort"));
+        assertThrows(LoiNghiepVuModel.class, () -> dieuKhien.batMay(id, phienB, 5101));
+        dieuKhien.batMay(id, phienB, 5101, 6101);
+        assertEquals(6101, tinA.get(0).duLieu().get("videoPort").getAsInt());
+        assertEquals(6100, tinB.get(1).duLieu().get("videoPort").getAsInt());
+        dieuKhien.ketThuc(id, phienA);
+        assertTrue(lichSu.get(0).video());
+        assertTrue(lichSu.get(0).noiDung().startsWith("Cuộc gọi video"));
+    }
 }

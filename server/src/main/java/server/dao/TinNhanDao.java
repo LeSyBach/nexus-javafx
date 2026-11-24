@@ -34,8 +34,8 @@ public final class TinNhanDao {
             }
             String sql = """
                     INSERT INTO tin_nhan(ma_gui,nguoi_gui_id,nguoi_nhan_id,noi_dung,bam_noi_dung,
-                        loai_tin,cuoc_goi_id,ket_qua_goi,thoi_luong_goi)
-                    VALUES(?,?,?,?,?,'cuoc_goi',?,?,?)
+                        loai_tin,cuoc_goi_id,ket_qua_goi,thoi_luong_goi,goi_video)
+                    VALUES(?,?,?,?,?,'cuoc_goi',?,?,?,?)
                     """;
             String noiDung = cuocGoi.noiDung();
             try (PreparedStatement lenh = db.prepareStatement(sql)) {
@@ -47,6 +47,7 @@ public final class TinNhanDao {
                 lenh.setString(6, cuocGoi.id().toString());
                 lenh.setString(7, cuocGoi.ketQua().name());
                 lenh.setLong(8, cuocGoi.soGiay());
+                lenh.setBoolean(9, cuocGoi.video());
                 lenh.executeUpdate();
             } catch (SQLIntegrityConstraintViolationException loi) {
                 daLuu = timCuocGoi(db, cuocGoi.nguoiGoi(), cuocGoi.id());
@@ -437,6 +438,7 @@ public final class TinNhanDao {
         if (!daThuHoi && "cuocGoi".equals(DuLieu.chu(tin, "loaiTin"))) {
             tin.addProperty("ketQuaGoi", dong.getString("ket_qua_goi"));
             tin.addProperty("thoiLuongGoi", dong.getLong("thoi_luong_goi"));
+            tin.addProperty("goiVideo", dong.getBoolean("goi_video"));
         }
         if (!daThuHoi && dong.getString("ma_luu") != null) {
             tin.add("tep",

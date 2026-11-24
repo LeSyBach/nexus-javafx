@@ -1,0 +1,3 @@
+USE nexus_javafx;
+ALTER TABLE tin_nhan
+    ADD COLUMN IF NOT EXISTS goi_video BOOLEAN NOT NULL DEFAULT FALSE;

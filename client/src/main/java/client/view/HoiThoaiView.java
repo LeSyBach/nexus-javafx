@@ -30,8 +30,9 @@ public final class HoiThoaiView extends BorderPane {
     private final KenhTCP kenh;
     private final HoiThoaiController dieuKhien;
     private final GoiThoaiController dieuKhienGoiThoai;
-    private final GoiThoaiView thanhGoiThoai = new GoiThoaiView();
+    private final GoiThoaiView cuaSoGoiThoai = new GoiThoaiView(this);
     private final Button nutGoiThoai = DoHoaView.nut("Gọi thoại", "nutHoSoPhu");
+    private final Button nutGoiVideo = DoHoaView.nut("Gọi video", "nutHoSoPhu");
     private final BooleanProperty dangCoCuocGoi = new SimpleBooleanProperty();
     private final DanhSachHoiThoaiModel danhSachModel = new DanhSachHoiThoaiModel();
     private final LichSuTinNhanModel lichSuModel = new LichSuTinNhanModel();
@@ -120,8 +121,7 @@ public final class HoiThoaiView extends BorderPane {
 
         dieuKhien = new HoiThoaiController(kenh, Platform::runLater);
         dieuKhienGoiThoai = new GoiThoaiController(kenh, Platform::runLater, this::capNhatGoiThoai);
-        thanhGoiThoai.ganHanhDong(dieuKhienGoiThoai);
-        setBottom(thanhGoiThoai);
+        cuaSoGoiThoai.ganHanhDong(dieuKhienGoiThoai);
         dieuKhienTaiKhoan = new TaiKhoanController(kenh);
         dieuKhienBanBe = new BanBeController(kenh);
         dieuKhienNhom = new NhomController(kenh);
@@ -469,22 +469,35 @@ public final class HoiThoaiView extends BorderPane {
         Region khoang = new Region();
         HBox.setHgrow(khoang, Priority.ALWAYS);
         nutGoiThoai.setId("goiThoai");
-        nutGoiThoai.setOnAction(e -> dieuKhienGoiThoai.goi(doiPhuong, tieuDe.getText()));
-        nutGoiThoai.disableProperty().bind(dangCoCuocGoi);
+        nutGoiVideo.setId("goiVideo");
+        nutGoiVideo.setGraphic(BieuTuongView.video(false));
+        nutGoiVideo.setOnAction(e -> dieuKhienGoiThoai.goiVideo(doiPhuong, tieuDe.getText()));
+        nutGoiVideo.disableProperty().bind(dangCoCuocGoi);
+        nutGoiVideo.managedProperty().bind(nutGoiVideo.visibleProperty());
+        nutGoiThoai.setOnAction(e -> {
+            if (dangCoCuocGoi.get()) {
+                cuaSoGoiThoai.hienLai();
+            } else {
+                dieuKhienGoiThoai.goi(doiPhuong, tieuDe.getText());
+            }
+        });
+        nutGoiThoai.textProperty().bind(javafx.beans.binding.Bindings.when(dangCoCuocGoi)
+                .then("Mở cuộc gọi").otherwise("Gọi thoại"));
         nutGoiThoai.managedProperty().bind(nutGoiThoai.visibleProperty());
         capNhatNutGoiThoai();
-        dau.getChildren().addAll(thongTin, khoang, nutGoiThoai);
+        dau.getChildren().addAll(thongTin, khoang, nutGoiThoai, nutGoiVideo);
         return dau;
     }
 
     private void capNhatGoiThoai(GoiThoaiController.HienThi duLieu) {
         dangCoCuocGoi.set(duLieu.trangThai() != GoiThoaiController.TrangThai.ranh);
         capNhatNutGoiThoai();
-        thanhGoiThoai.capNhat(duLieu);
+        cuaSoGoiThoai.capNhat(duLieu);
     }
 
     private void capNhatNutGoiThoai() {
-        nutGoiThoai.setVisible(doiPhuong != null);
+        nutGoiThoai.setVisible(doiPhuong != null || dangCoCuocGoi.get());
+        nutGoiVideo.setVisible(doiPhuong != null);
     }
 
     private VBox vungSoan() {
@@ -854,7 +867,13 @@ public final class HoiThoaiView extends BorderPane {
                 String idNguoiGoiLai = doiPhuong;
                 String tenNguoiGoiLai = tieuDe.getText();
                 nhom = new LichSuGoiView(tin, cuaMinh, dangCoCuocGoi,
-                        () -> dieuKhienGoiThoai.goi(idNguoiGoiLai, tenNguoiGoiLai), this::thaoTacTin);
+                        () -> {
+                            if (tin.has("goiVideo") && tin.get("goiVideo").getAsBoolean()) {
+                                dieuKhienGoiThoai.goiVideo(idNguoiGoiLai, tenNguoiGoiLai);
+                            } else {
+                                dieuKhienGoiThoai.goi(idNguoiGoiLai, tenNguoiGoiLai);
+                            }
+                        }, this::thaoTacTin);
             } else {
                 nhom = new BongTinNhanView(tin, idCuaMinh, this::chonTraLoi, this::thaoTacTin,
                         this::taiTep, dieuKhienAnh);
