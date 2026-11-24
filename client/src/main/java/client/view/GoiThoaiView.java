@@ -90,12 +90,12 @@ final class GoiThoaiView extends BorderPane {
         anhDoiPhuong.fitWidthProperty().bind(vungHinh.widthProperty().subtract(16));
         anhDoiPhuong.fitHeightProperty().bind(vungHinh.heightProperty().subtract(16));
         anhCuaMinh.setPreserveRatio(true);
-        anhCuaMinh.setFitWidth(136);
-        anhCuaMinh.setFitHeight(102);
+        anhCuaMinh.setFitWidth(96);
+        anhCuaMinh.setFitHeight(72);
         StackPane oXemTruoc = new StackPane(anhCuaMinh, choAnhCuaMinh);
-        oXemTruoc.setMinSize(136, 102);
+        oXemTruoc.setMinSize(96, 72);
         xemTruoc.getChildren().addAll(oXemTruoc, DoHoaView.nhan("Bạn", "nhanNutGoi"));
-        xemTruoc.setMaxSize(160, 140);
+        xemTruoc.setMaxSize(114, 108);
         xemTruoc.setAlignment(Pos.CENTER);
         xemTruoc.getStyleClass().add("xemTruocVideo");
         StackPane.setAlignment(xemTruoc, Pos.TOP_RIGHT);
@@ -146,7 +146,7 @@ final class GoiThoaiView extends BorderPane {
         veNguoiGoi(duLieu.tenDoiPhuong());
         loiVideo.setText(duLieu.thongBaoVideo());
         loiVideo.setVisible(!duLieu.thongBaoVideo().isEmpty() && dangGoi);
-        xemTruoc.setVisible(duLieu.goiVideo() && dangGoi);
+        xemTruoc.setVisible(duLieu.goiVideo() && dangGoi && anhCuaMinh.getImage() != null);
         vungCamera.setVisible(duLieu.goiVideo() && dangGoi);
         camera.setGraphic(BieuTuongView.video(duLieu.tatCamera()));
         camera.pseudoClassStateChanged(PseudoClass.getPseudoClass("micTat"), duLieu.tatCamera());
@@ -209,6 +209,7 @@ final class GoiThoaiView extends BorderPane {
         }
         if (hinh.cuaMinh()) {
             anhCuaMinh.setImage(anh);
+            xemTruoc.setVisible(anh != null);
             choAnhCuaMinh.setVisible(anh == null);
             choAnhCuaMinh.setText(anh == null ? "Camera chưa bật" : "");
         } else {
@@ -220,6 +221,7 @@ final class GoiThoaiView extends BorderPane {
     private void xoaHinh() {
         anhDoiPhuong.setImage(null);
         anhCuaMinh.setImage(null);
+        xemTruoc.setVisible(false);
         giua.setVisible(true);
         choAnhCuaMinh.setVisible(true);
     }
