@@ -289,8 +289,5 @@
 .nutTronCuocGoi:focused { -fx-border-color: #c6f4d7; }
 .nutTronCuocGoi:pressed { -fx-opacity: 0.78; }
 .nutTronCuocGoi:disabled { -fx-opacity: 0.45; }
-.nutDongCuocGoi { -fx-background-color: #34534a; -fx-text-fill: #f2faf5; -fx-padding: 13 30; }
-.nutDongCuocGoi:hover { -fx-background-color: #476a5e; }
-.nutDongCuocGoi:focused { -fx-border-color: #c6f4d7; }
 .xemTruocVideo { -fx-background-color: #10231f; -fx-background-radius: 14; -fx-padding: 9; -fx-border-color: #638b77; -fx-border-radius: 14; }
 .cuaSoGoiThoai .loiVideo { -fx-text-fill: #f2d3a1; -fx-padding: 10 20 0; -fx-font-size: 12; }

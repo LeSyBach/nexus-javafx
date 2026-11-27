@@ -37,7 +37,6 @@ final class GoiThoaiView extends BorderPane {
     private final Button batMay = nutGoi("Bắt máy", BieuTuongView.dienThoai(), "nutBatMay");
     private final Button mic = nutGoi("Tắt mic", BieuTuongView.micro(false), "nutMicGoi");
     private final Button ketThuc = nutGoi("Cúp máy", BieuTuongView.cupMay(), "nutCupMay");
-    private final Button dong = DoHoaView.nut("Đóng", "nutDongCuocGoi");
     private final Button camera = nutGoi("Tắt camera", BieuTuongView.video(false), "nutMicGoi");
     private final Label nhanCamera = DoHoaView.nhan("Tắt camera", "nhanNutGoi");
     private final Label loiVideo = DoHoaView.nhan("", "loiVideo");
@@ -102,7 +101,7 @@ final class GoiThoaiView extends BorderPane {
         StackPane.setMargin(xemTruoc, new Insets(16));
         vungHinh.getChildren().addAll(anhDoiPhuong, giua, xemTruoc);
         setCenter(vungHinh);
-        HBox thaoTac = new HBox(24, vungMic, vungCamera, vungKetThuc, vungBatMay, dong);
+        HBox thaoTac = new HBox(24, vungMic, vungCamera, vungKetThuc, vungBatMay);
         thaoTac.setAlignment(Pos.CENTER);
         thaoTac.getStyleClass().add("thaoTacCuocGoi");
         loiVideo.setWrapText(true);
@@ -114,8 +113,6 @@ final class GoiThoaiView extends BorderPane {
         thoiLuong.setId("thoiLuongGoiThoai");
         thoiLuong.managedProperty().bind(thoiLuong.visibleProperty());
         thoiLuong.setVisible(false);
-        dong.managedProperty().bind(dong.visibleProperty());
-        dong.setOnAction(e -> cuaSo.hide());
         dongHo.setCycleCount(Animation.INDEFINITE);
     }
 
@@ -131,16 +128,16 @@ final class GoiThoaiView extends BorderPane {
     void capNhat(GoiThoaiController.HienThi duLieu) {
         boolean cuocGoiMoi = !dangGoi && duLieu.trangThai() != GoiThoaiController.TrangThai.ranh;
         dangGoi = duLieu.trangThai() != GoiThoaiController.TrangThai.ranh;
-        if (duLieu.thongBao().isEmpty()) {
+        if (!dangGoi || duLieu.thongBao().isEmpty()) {
             xoaHinh();
             hienDongHo(false);
             if (cuaSo != null) {
-                cuaSo.hide();
+                cuaSo.close();
             }
             return;
         }
         taoCuaSo();
-        if (cuocGoiMoi || !dangGoi) {
+        if (cuocGoiMoi) {
             xoaHinh();
         }
         veNguoiGoi(duLieu.tenDoiPhuong());
@@ -178,7 +175,6 @@ final class GoiThoaiView extends BorderPane {
         ketThuc.setAccessibleText(chuKetThuc);
         ketThuc.setTooltip(new Tooltip(chuKetThuc));
         vungKetThuc.setVisible(dangGoi);
-        dong.setVisible(!dangGoi);
         hienDongHo(dangNoiChuyen);
         if (cuocGoiMoi) {
             hienLai();
@@ -188,7 +184,7 @@ final class GoiThoaiView extends BorderPane {
     }
 
     void hienLai() {
-        if (cuaSo != null) {
+        if (dangGoi && cuaSo != null) {
             cuaSo.show();
             cuaSo.setIconified(false);
             cuaSo.toFront();

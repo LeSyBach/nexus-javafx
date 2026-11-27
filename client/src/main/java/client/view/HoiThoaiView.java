@@ -493,6 +493,9 @@ public final class HoiThoaiView extends BorderPane {
         dangCoCuocGoi.set(duLieu.trangThai() != GoiThoaiController.TrangThai.ranh);
         capNhatNutGoiThoai();
         cuaSoGoiThoai.capNhat(duLieu);
+        if (!dangCoCuocGoi.get() && !duLieu.thongBao().isEmpty()) {
+            loi.setText(duLieu.thongBao());
+        }
     }
 
     private void capNhatNutGoiThoai() {
