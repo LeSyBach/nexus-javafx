@@ -172,6 +172,24 @@ public final class MayChuController {
         }
     }
 
+    private void phatTrangThaiChan(long nguoi, long dich, TinNhanDao.TrangThaiChan trangThai) {
+        ThongDiep choNguoiChan = ThongDiep.suKien("chanNguoiDungDoi", DuLieu.tao(
+                "nguoiNhanId", Long.toString(dich), "daChan", trangThai.daChan(), "biChan", trangThai.biChan()));
+        ThongDiep choDoiPhuong = ThongDiep.suKien("chanNguoiDungDoi", DuLieu.tao(
+                "nguoiNhanId", Long.toString(nguoi), "daChan", trangThai.biChan(), "biChan", trangThai.daChan()));
+        for (Phien client : cacClient) {
+            NguoiDungModel taiKhoan = client.nguoiDung;
+            if (taiKhoan == null) {
+                continue;
+            }
+            if (taiKhoan.id() == nguoi) {
+                client.gui(choNguoiChan);
+            } else if (taiKhoan.id() == dich) {
+                client.gui(choDoiPhuong);
+            }
+        }
+    }
+
     private static String maNhomHopLe(JsonObject duLieu, String khoa) {
         String ma = DuLieu.chu(duLieu, khoa);
         if (!ma.matches("[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}")) {
@@ -271,8 +289,12 @@ public final class MayChuController {
                         canDangNhap();
                         long id = DuLieu.id(duLieu, "nguoiDungId", false);
                         JsonObject ho = khoHoSo.docChoNguoiXem(id, nguoiDung.id());
-                        ho.addProperty("daChan", tinNhanDao.daChan(nguoiDung.id(), id));
-                        thanhCong(yeuCau, DuLieu.tao("hoSo", ho));
+                        synchronized (khoTuongTac) {
+                            TinNhanDao.TrangThaiChan trangThai = tinNhanDao.trangThaiChan(nguoiDung.id(), id);
+                            ho.addProperty("daChan", trangThai.daChan());
+                            ho.addProperty("biChan", trangThai.biChan());
+                            thanhCong(yeuCau, DuLieu.tao("hoSo", ho));
+                        }
                     }
                     case "thongTinChat" -> {
                         canDangNhap();
@@ -416,8 +438,10 @@ public final class MayChuController {
                                 }
                             } else {
                                 khoHoSo.doc(dich);
-                                tinNhanDao.datChan(nguoi, dich, yeuCau.loai().equals("chanNguoiDung"));
-                                if (yeuCau.loai().equals("chanNguoiDung")) {
+                                boolean chan = yeuCau.loai().equals("chanNguoiDung");
+                                TinNhanDao.TrangThaiChan trangThai = tinNhanDao.datChan(nguoi, dich, chan);
+                                phatTrangThaiChan(nguoi, dich, trangThai);
+                                if (chan) {
                                     goiThoai.khiChan(nguoi, dich);
                                 }
                             }
@@ -729,7 +753,8 @@ public final class MayChuController {
 
         private void moiCuocGoi(UUID id, NguoiDungModel nguoiGoi, long nguoiNhan, int port, int videoPort)
                 throws SQLException, IOException {
-            if (tinNhanDao.daChan(nguoiGoi.id(), nguoiNhan) || tinNhanDao.daChan(nguoiNhan, nguoiGoi.id())) {
+            TinNhanDao.TrangThaiChan trangThai = tinNhanDao.trangThaiChan(nguoiGoi.id(), nguoiNhan);
+            if (trangThai.daChan() || trangThai.biChan()) {
                 throw new LoiNghiepVuModel("khongTheGoiThoai", "Không thể gọi người này.");
             }
             if (cuocGoiChoLuu.contains(id) || tinNhanDao.daLuuCuocGoi(nguoiGoi.id(), id)) {

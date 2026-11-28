@@ -313,7 +313,7 @@ public final class UngDungNexus extends Application {
     private void datNoiDung(javafx.scene.Parent noiDung) {
         if (cuaSo.getScene() == null) {
             Scene canh = new Scene(noiDung, 1120, 760);
-            canh.getStylesheets().add(getClass().getResource("/giao-dien.css").toExternalForm());
+            DoHoaView.ganGiaoDien(canh);
             cuaSo.setScene(canh);
         } else {
             cuaSo.getScene().setRoot(noiDung);

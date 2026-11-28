@@ -93,6 +93,11 @@ public final class TruyenTepTCP implements AutoCloseable {
 
     public CompletableFuture<JsonObject> gui(Path tep, String nguoiNhan, String noiDung, String maGui,
                                              String traLoi, DoubleConsumer tienTrinh) {
+        return gui(tep, nguoiNhan, noiDung, maGui, traLoi, false, tienTrinh);
+    }
+
+    public CompletableFuture<JsonObject> gui(Path tep, String nguoiNhan, String noiDung, String maGui,
+                                             String traLoi, boolean tinThoai, DoubleConsumer tienTrinh) {
         return thucHien(() -> {
             boolean daBatDau = false;
             try {
@@ -112,10 +117,14 @@ public final class TruyenTepTCP implements AutoCloseable {
                 }
                 kiemTraHuy();
                 String sha = HexFormat.of().formatHex(bam.digest());
-                JsonObject tra = guiLenh("tepBatDau",
-                        DuLieu.tao("nguoiNhanId", nguoiNhan, "tenTep", tep.getFileName().toString(),
-                                "kichThuoc", Long.toString(kichThuoc), "sha256", sha, "noiDung", noiDung,
-                                "maGui", maGui, "traLoiId", traLoi));
+                String ten = tinThoai ? "Tin-nhan-thoai.wav" : tep.getFileName().toString();
+                JsonObject khai = DuLieu.tao("nguoiNhanId", nguoiNhan, "tenTep", ten,
+                        "kichThuoc", Long.toString(kichThuoc), "sha256", sha, "noiDung", noiDung,
+                        "maGui", maGui, "traLoiId", traLoi);
+                if (tinThoai) {
+                    khai.addProperty("tinThoai", true);
+                }
+                JsonObject tra = guiLenh("tepBatDau", khai);
                 if (tra.get("daCo").getAsBoolean()) {
                     tienTrinh.accept(1);
                     return tra.getAsJsonObject("tinNhan");
@@ -157,65 +166,79 @@ public final class TruyenTepTCP implements AutoCloseable {
     }
 
     public CompletableFuture<Path> tai(String tinId, Path dich, DoubleConsumer tienTrinh) {
+        return thucHien(() -> taiVao(tinId, dich, tienTrinh));
+    }
+
+    public CompletableFuture<Path> taiTam(String tinId) {
         return thucHien(() -> {
-            Path tam = null;
+            Path dich = Files.createTempFile("nexus-nghe-thoai-", ".wav");
             try {
-                kiemTraHuy();
-                JsonObject thongTin = guiLenh("tepThongTin", DuLieu.tao("tinNhanId", tinId));
-                long kichThuoc = Long.parseLong(DuLieu.chu(thongTin, "kichThuoc"));
-                if (kichThuoc < 0 || kichThuoc > gioiHan) {
-                    throw new IOException("Dung lượng tệp không hợp lệ.");
-                }
-                String sha = DuLieu.chu(thongTin, "sha256");
-                if (!sha.matches("[a-f0-9]{64}")) {
-                    throw new IOException("Mã kiểm tra tệp không hợp lệ.");
-                }
-                Path thuMuc = dich.toAbsolutePath().getParent();
-                tam = Files.createTempFile(thuMuc, "nexus-", ".part");
-                MessageDigest bam = boBam();
-                long viTri = 0;
-                tienTrinh.accept(0);
-                try (OutputStream ghi = new BufferedOutputStream(Files.newOutputStream(tam))) {
-                    while (viTri < kichThuoc) {
-                        kiemTraHuy();
-                        JsonObject tra = guiLenh("tepDocKhoi",
-                                DuLieu.tao("tinNhanId", tinId, "viTri", Long.toString(viTri)));
-                        if (!DuLieu.chu(tra, "viTri").equals(Long.toString(viTri))) {
-                            throw new IOException("Khối tải về sai thứ tự.");
-                        }
-                        String chu = DuLieu.chu(tra, "duLieu");
-                        if (chu.length() > 32768) {
-                            throw new IOException("Khối tải về vượt giới hạn.");
-                        }
-                        byte[] khoi = Base64.getDecoder().decode(chu);
-                        if (khoi.length < 1 || khoi.length > KHOI || viTri + khoi.length > kichThuoc) {
-                            throw new IOException("Khối tải về không đầy đủ.");
-                        }
-                        ghi.write(khoi);
-                        bam.update(khoi);
-                        viTri += khoi.length;
-                        tienTrinh.accept((double) viTri / kichThuoc);
-                    }
-                }
-                kiemTraHuy();
-                if (!HexFormat.of().formatHex(bam.digest()).equals(sha)) {
-                    throw new IOException("Tệp tải về không khớp SHA-256. Chưa ghi đè tệp đích.");
-                }
-                try {
-                    Files.move(tam, dich.toAbsolutePath(), StandardCopyOption.ATOMIC_MOVE,
-                            StandardCopyOption.REPLACE_EXISTING);
-                } catch (AtomicMoveNotSupportedException loi) {
-                    Files.move(tam, dich.toAbsolutePath(), StandardCopyOption.REPLACE_EXISTING);
-                }
-                tam = null;
-                tienTrinh.accept(1);
-                return dich;
-            } finally {
-                if (tam != null) {
-                    Files.deleteIfExists(tam);
-                }
+                return taiVao(tinId, dich, x -> { });
+            } catch (Exception loi) {
+                Files.deleteIfExists(dich);
+                throw loi;
             }
         });
+    }
+
+    private Path taiVao(String tinId, Path dich, DoubleConsumer tienTrinh) throws IOException, NoSuchAlgorithmException {
+        Path tam = null;
+        try {
+            kiemTraHuy();
+            JsonObject thongTin = guiLenh("tepThongTin", DuLieu.tao("tinNhanId", tinId));
+            long kichThuoc = Long.parseLong(DuLieu.chu(thongTin, "kichThuoc"));
+            if (kichThuoc < 0 || kichThuoc > gioiHan) {
+                throw new IOException("Dung lượng tệp không hợp lệ.");
+            }
+            String sha = DuLieu.chu(thongTin, "sha256");
+            if (!sha.matches("[a-f0-9]{64}")) {
+                throw new IOException("Mã kiểm tra tệp không hợp lệ.");
+            }
+            Path thuMuc = dich.toAbsolutePath().getParent();
+            tam = Files.createTempFile(thuMuc, "nexus-", ".part");
+            MessageDigest bam = boBam();
+            long viTri = 0;
+            tienTrinh.accept(0);
+            try (OutputStream ghi = new BufferedOutputStream(Files.newOutputStream(tam))) {
+                while (viTri < kichThuoc) {
+                    kiemTraHuy();
+                    JsonObject tra = guiLenh("tepDocKhoi",
+                            DuLieu.tao("tinNhanId", tinId, "viTri", Long.toString(viTri)));
+                    if (!DuLieu.chu(tra, "viTri").equals(Long.toString(viTri))) {
+                        throw new IOException("Khối tải về sai thứ tự.");
+                    }
+                    String chu = DuLieu.chu(tra, "duLieu");
+                    if (chu.length() > 32768) {
+                        throw new IOException("Khối tải về vượt giới hạn.");
+                    }
+                    byte[] khoi = Base64.getDecoder().decode(chu);
+                    if (khoi.length < 1 || khoi.length > KHOI || viTri + khoi.length > kichThuoc) {
+                        throw new IOException("Khối tải về không đầy đủ.");
+                    }
+                    ghi.write(khoi);
+                    bam.update(khoi);
+                    viTri += khoi.length;
+                    tienTrinh.accept((double) viTri / kichThuoc);
+                }
+            }
+            kiemTraHuy();
+            if (!HexFormat.of().formatHex(bam.digest()).equals(sha)) {
+                throw new IOException("Tệp tải về không khớp SHA-256. Chưa ghi đè tệp đích.");
+            }
+            try {
+                Files.move(tam, dich.toAbsolutePath(), StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException loi) {
+                Files.move(tam, dich.toAbsolutePath(), StandardCopyOption.REPLACE_EXISTING);
+            }
+            tam = null;
+            tienTrinh.accept(1);
+            return dich;
+        } finally {
+            if (tam != null) {
+                Files.deleteIfExists(tam);
+            }
+        }
     }
 
     public static String tenLuuAnToan(String ten) {
@@ -234,6 +257,6 @@ public final class TruyenTepTCP implements AutoCloseable {
     @Override
     public void close() {
         huy();
-        luong.shutdownNow();
+        luong.shutdown();
     }
 }

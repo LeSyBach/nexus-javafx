@@ -12,7 +12,7 @@ import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
 /**
- * Các thao tác bạn bè và tra cứu hồ sơ công khai.
+ * Các thao tác bạn bè, hồ sơ công khai và chặn người dùng.
  */
 public final class BanBeController {
     private final KenhTCP kenh;
@@ -82,5 +82,9 @@ public final class BanBeController {
 
     public CompletableFuture<JsonObject> hoSoCongKhai(String id) {
         return kenh.yeuCau("hoSoCongKhai", DuLieu.tao("nguoiDungId", id));
+    }
+
+    public CompletableFuture<JsonObject> datChan(String id, boolean chan) {
+        return kenh.yeuCau(chan ? "chanNguoiDung" : "boChanNguoiDung", DuLieu.tao("nguoiNhanId", id));
     }
 }

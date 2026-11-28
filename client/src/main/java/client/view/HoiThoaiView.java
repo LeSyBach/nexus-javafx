@@ -1,7 +1,10 @@
 package client.view;
 
 import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.binding.BooleanBinding;
 import client.controller.BanBeController;
 import client.controller.GoiThoaiController;
 import client.controller.HoiThoaiController;
@@ -22,9 +25,12 @@ import javafx.scene.control.*;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
 
+import java.nio.file.Path;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 public final class HoiThoaiView extends BorderPane {
     private final KenhTCP kenh;
@@ -61,6 +67,9 @@ public final class HoiThoaiView extends BorderPane {
     private final java.util.function.Consumer<JsonObject> khiCapNhatHoSo;
     private HoSoView manHinhHoSo;
     private final BorderPane vungChat = new BorderPane();
+    private final VBox oSoan;
+    private final ObjectProperty<TrangThaiGui> trangThaiGui = new SimpleObjectProperty<>(TrangThaiGui.binhThuong);
+    private int lanTaiHoSoDoiPhuong;
     private final Button nutHoSo = DoHoaView.nut("", "nutAnhHoSo");
     private VBox cotHoiThoai;
     private final ListView<JsonObject> danhSach = new ListView<>();
@@ -74,6 +83,7 @@ public final class HoiThoaiView extends BorderPane {
     private final TextArea noiDung = new TextArea();
     private final Label demKyTu = DoHoaView.nhan("0 / 4000", "chuGoiY");
     private final Button gui = DoHoaView.nut("Gửi  ↗", "nutGui");
+    private final GhiAmView ghiAm = new GhiAmView(this::guiTinThoai);
     private final Button taiTinCu = DoHoaView.nut("Xem tin nhắn trước", "nutTaiTinCu");
     private JsonObject tinDangTraLoi;
     private final HBox vungTraLoi = new HBox(12);
@@ -104,6 +114,10 @@ public final class HoiThoaiView extends BorderPane {
     private final Button veCuoi = DoHoaView.nut("", "nutVeCuoi");
 
     private record TinDaVe(JsonObject duLieu, boolean daXem) {
+    }
+
+    private enum TrangThaiGui {
+        binhThuong, dangTai, chuaTaiDuoc, daChan, biChan
     }
 
     public HoiThoaiView(KenhTCP kenh, JsonObject nguoiDung, Runnable khiDangXuat) {
@@ -179,7 +193,9 @@ public final class HoiThoaiView extends BorderPane {
             }
         });
         vungChat.setCenter(vungCuon);
-        vungChat.setBottom(vungSoan());
+        oSoan = vungSoan();
+        vungChat.setBottom(oSoan);
+        trangThaiGui.addListener((giaTri, cu, moi) -> capNhatVungSoan(moi));
         setCenter(vungChat);
 
         cacTin.getStyleClass().add("cacTinNhan");
@@ -336,6 +352,12 @@ public final class HoiThoaiView extends BorderPane {
             case hoiThoaiBiXoa -> sauKhiXoaHoiThoai(DuLieu.chu(suKien.duLieu(), "nguoiNhanId"));
             case banBeCapNhat -> hopBanBe.taiDanhSach();
             case hoSoCapNhat -> capNhatHoSo(suKien.duLieu().getAsJsonObject("hoSo"));
+            case trangThaiChanDoi -> {
+                if (Objects.equals(doiPhuong, DuLieu.chu(suKien.duLieu(), "nguoiNhanId"))) {
+                    lanTaiHoSoDoiPhuong++;
+                    docTrangThaiChan(suKien.duLieu());
+                }
+            }
             case cuocGoiDen, cuocGoiBatDau, cuocGoiKetThuc ->
                     dieuKhienGoiThoai.nhanSuKien(suKien.loai().name(), suKien.duLieu());
         }
@@ -491,6 +513,9 @@ public final class HoiThoaiView extends BorderPane {
 
     private void capNhatGoiThoai(GoiThoaiController.HienThi duLieu) {
         dangCoCuocGoi.set(duLieu.trangThai() != GoiThoaiController.TrangThai.ranh);
+        if (dangCoCuocGoi.get() && ghiAm.dangGhi()) {
+            ghiAm.huy();
+        }
         capNhatNutGoiThoai();
         cuaSoGoiThoai.capNhat(duLieu);
         if (!dangCoCuocGoi.get() && !duLieu.thongBao().isEmpty()) {
@@ -501,6 +526,104 @@ public final class HoiThoaiView extends BorderPane {
     private void capNhatNutGoiThoai() {
         nutGoiThoai.setVisible(doiPhuong != null || dangCoCuocGoi.get());
         nutGoiVideo.setVisible(doiPhuong != null);
+    }
+
+    BooleanBinding daChanDoiPhuong() {
+        return trangThaiGui.isEqualTo(TrangThaiGui.daChan);
+    }
+
+    BooleanBinding chuaBietTrangThaiChan() {
+        return trangThaiGui.isEqualTo(TrangThaiGui.dangTai).or(trangThaiGui.isEqualTo(TrangThaiGui.chuaTaiDuoc));
+    }
+
+    String tenHoiThoai() {
+        return tieuDe.getText();
+    }
+
+    void xacNhanChan(javafx.scene.Node neo, String dich, String ten, boolean chan) {
+        if (!chan) {
+            ThongBaoNoiView.xacNhan(neo, "Bỏ chặn người dùng", "Bạn muốn bỏ chặn " + ten + "?", "Bỏ chặn",
+                    () -> datChan(dich, false));
+        } else {
+            ThongBaoNoiView.xacNhan(neo, "Chặn người dùng",
+                    "Sau khi chặn, bạn và " + ten + " sẽ không thể nhắn tin riêng hoặc gọi cho nhau.", "Chặn",
+                    () -> datChan(dich, true));
+        }
+    }
+
+    private CompletableFuture<Void> datChan(String dich, boolean chan) {
+        int lan = lanTaiHoSoDoiPhuong;
+        return dieuKhienBanBe.datChan(dich, chan).thenRunAsync(() -> {
+            if (!daDong && Objects.equals(doiPhuong, dich) && lan == lanTaiHoSoDoiPhuong) {
+                taiHoSoDoiPhuong(dich);
+            }
+        }, Platform::runLater);
+    }
+
+    private void docTrangThaiChan(JsonObject duLieu) {
+        if (duLieu.has("daChan") && duLieu.get("daChan").getAsBoolean()) {
+            trangThaiGui.set(TrangThaiGui.daChan);
+        } else if (duLieu.has("biChan") && duLieu.get("biChan").getAsBoolean()) {
+            trangThaiGui.set(TrangThaiGui.biChan);
+        } else {
+            trangThaiGui.set(TrangThaiGui.binhThuong);
+        }
+    }
+
+    private void capNhatVungSoan(TrangThaiGui trangThai) {
+        if (trangThai == TrangThaiGui.binhThuong) {
+            vungChat.setBottom(oSoan);
+            return;
+        }
+        ghiAm.huy();
+        VBox vung = new VBox();
+        vung.setId("trangThaiChanHoiThoai");
+        vung.getStyleClass().add("vungSoan");
+        HBox hang = new HBox(12);
+        hang.getStyleClass().add("khungSoan");
+        hang.setAlignment(Pos.CENTER_LEFT);
+        Label noiDungTrangThai = DoHoaView.nhan(switch (trangThai) {
+            case dangTai -> "Đang kiểm tra quyền gửi tin…";
+            case chuaTaiDuoc -> "Chưa tải được trạng thái hội thoại.";
+            case daChan -> "Bạn đã chặn người này.";
+            case biChan -> "Không thể gửi tin nhắn";
+            default -> "";
+        }, "giaTriHoSo");
+        noiDungTrangThai.setWrapText(true);
+        noiDungTrangThai.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(noiDungTrangThai, Priority.ALWAYS);
+        hang.getChildren().add(noiDungTrangThai);
+        vung.getChildren().add(hang);
+        if (trangThai == TrangThaiGui.daChan) {
+            Button boChan = DoHoaView.nut("Bỏ chặn", "nutHoSoPhu");
+            boChan.setId("boChanTrongHoiThoai");
+            boChan.setMinWidth(Region.USE_PREF_SIZE);
+            Label loiBoChan = DoHoaView.nhan("", "loiChat");
+            loiBoChan.setWrapText(true);
+            loiBoChan.visibleProperty().bind(loiBoChan.textProperty().isNotEmpty());
+            loiBoChan.managedProperty().bind(loiBoChan.visibleProperty());
+            boChan.setOnAction(e -> {
+                boChan.setDisable(true);
+                loiBoChan.setText("");
+                datChan(doiPhuong, false).whenCompleteAsync((x, sai) -> {
+                    boChan.setDisable(false);
+                    if (sai != null) {
+                        loiBoChan.setText(DoHoaView.thongBao(sai));
+                    }
+                }, Platform::runLater);
+            });
+            hang.getChildren().add(boChan);
+            vung.setSpacing(5);
+            vung.getChildren().add(loiBoChan);
+        } else if (trangThai == TrangThaiGui.chuaTaiDuoc) {
+            Button thuLai = DoHoaView.nut("Thử lại", "nutHoSoPhu");
+            thuLai.setOnAction(e -> {
+                trangThaiGui.set(TrangThaiGui.dangTai);
+                taiHoSoDoiPhuong(doiPhuong);
+            });
+            hang.getChildren().add(thuLai);
+        }
+        vungChat.setBottom(vung);
     }
 
     private VBox vungSoan() {
@@ -560,6 +683,14 @@ public final class HoiThoaiView extends BorderPane {
         anh.setGraphic(BieuTuongView.anh());
         anh.setTooltip(new Tooltip("Gửi ảnh"));
         anh.setAccessibleText("Gửi ảnh");
+        Button micro = DoHoaView.nut("", "nutIconSoan");
+        micro.setId("ghiAmTinNhan");
+        micro.setGraphic(BieuTuongView.micro(false));
+        micro.setTooltip(new Tooltip("Ghi âm tin nhắn"));
+        micro.setAccessibleText("Ghi âm tin nhắn");
+        micro.setMinWidth(Region.USE_PREF_SIZE);
+        micro.disableProperty().bind(dangCoCuocGoi);
+        micro.setOnAction(suKien -> ghiAm.batDau());
         gui.setText("");
         gui.setGraphic(BieuTuongView.gui());
         gui.getStyleClass().add("nutIconSoan");
@@ -572,7 +703,7 @@ public final class HoiThoaiView extends BorderPane {
         noiDung.setMinWidth(80);
         tep.setOnAction(suKien -> chonTep(false));
         anh.setOnAction(suKien -> chonTep(true));
-        khung.getChildren().addAll(bieuCam, tep, anh, noiDung, gui);
+        khung.getChildren().addAll(bieuCam, tep, anh, micro, noiDung, gui);
         Button bo = DoHoaView.nut("Bỏ tệp", "nutDinhKem");
         bo.setOnAction(suKien -> {
             tepDangChon = null;
@@ -618,7 +749,7 @@ public final class HoiThoaiView extends BorderPane {
         vungTraLoi.managedProperty().bind(vungTraLoi.visibleProperty());
         loi.setWrapText(true);
         loi.setMaxWidth(Double.MAX_VALUE);
-        VBox khungNhap = new VBox(8, vungTraLoi, vungTepChon, khung);
+        VBox khungNhap = new VBox(8, vungTraLoi, vungTepChon, ghiAm, khung);
         khungNhap.getStyleClass().add("khungSoan");
         vung.getChildren().addAll(loi, vungTruyenTep, luoi, khungNhap, goiY);
         return vung;
@@ -632,6 +763,7 @@ public final class HoiThoaiView extends BorderPane {
             danhDauDangDoc();
             return;
         }
+        ghiAm.huy();
         if (!dangGui) {
             tepDangChon = null;
             capNhatTepChon();
@@ -650,15 +782,33 @@ public final class HoiThoaiView extends BorderPane {
 
     private void taiAnhDauChat(String id, String ten) {
         if (id == null) {
+            lanTaiHoSoDoiPhuong++;
+            trangThaiGui.set(TrangThaiGui.binhThuong);
             anhDauChat.getChildren().setAll(DoHoaView.nhan("#", "bieuTuongPhong"));
             return;
         }
+        trangThaiGui.set(TrangThaiGui.dangTai);
         anhDauChat.getChildren().setAll(DoHoaView.anhHoSo(DuLieu.tao("id", id, "tenHienThi", ten), 44));
+        taiHoSoDoiPhuong(id);
+    }
+
+    private void taiHoSoDoiPhuong(String id) {
+        int lan = ++lanTaiHoSoDoiPhuong;
         dieuKhienBanBe.hoSoCongKhai(id).whenComplete((tra, sai) -> Platform.runLater(() -> {
-            if (daDong || sai != null || !Objects.equals(doiPhuong, id)) {
+            if (daDong || !Objects.equals(doiPhuong, id)) {
                 return;
             }
-            StackPane anh = DoHoaView.anhHoSo(tra.getAsJsonObject("hoSo"), 44);
+            if (sai != null) {
+                if (lan == lanTaiHoSoDoiPhuong && trangThaiGui.get() == TrangThaiGui.dangTai) {
+                    trangThaiGui.set(TrangThaiGui.chuaTaiDuoc);
+                }
+                return;
+            }
+            JsonObject hoSo = tra.getAsJsonObject("hoSo");
+            if (lan == lanTaiHoSoDoiPhuong) {
+                docTrangThaiChan(hoSo);
+            }
+            StackPane anh = DoHoaView.anhHoSo(hoSo, 44);
             anh.setClip(new javafx.scene.shape.Circle(22, 22, 22));
             anhDauChat.getChildren().setAll(anh);
         }));
@@ -879,7 +1029,7 @@ public final class HoiThoaiView extends BorderPane {
                         }, this::thaoTacTin);
             } else {
                 nhom = new BongTinNhanView(tin, idCuaMinh, this::chonTraLoi, this::thaoTacTin,
-                        this::taiTep, dieuKhienAnh);
+                        this::taiTep, dieuKhienAnh, dieuKhien::taiTinThoai);
             }
             HBox hang = new HBox(9);
             hang.setAlignment(cuaMinh ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
@@ -1037,7 +1187,7 @@ public final class HoiThoaiView extends BorderPane {
     }
 
     private void chonTraLoi(JsonObject tin) {
-        if (dangGui || LichSuTinNhanModel.daThuHoi(tin)) {
+        if (trangThaiGui.get() != TrangThaiGui.binhThuong || dangGui || LichSuTinNhanModel.daThuHoi(tin)) {
             return;
         }
         tinDangTraLoi = tin;
@@ -1125,6 +1275,9 @@ public final class HoiThoaiView extends BorderPane {
     }
 
     private void guiTin() {
+        if (trangThaiGui.get() != TrangThaiGui.binhThuong) {
+            return;
+        }
         if (tepDangChon != null) {
             guiTep();
             return;
@@ -1252,8 +1405,48 @@ public final class HoiThoaiView extends BorderPane {
         });
     }
 
+    private CompletableFuture<Void> guiTinThoai(Path tep) {
+        if (trangThaiGui.get() != TrangThaiGui.binhThuong) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Không thể gửi tin nhắn."));
+        }
+        if (daDong || dangGui || dieuKhien.dangTruyen()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("Chưa thể gửi đoạn thoại. Hãy đợi lượt gửi hiện tại hoàn tất."));
+        }
+
+        String dich = doiPhuong;
+        String traLoi = maTraLoi();
+        String ten = "Gửi đoạn thoại";
+        dangGui = true;
+        gui.setDisable(true);
+        batTienTrinh(ten);
+        return dieuKhien.guiTinThoai(tep, dich, traLoi, capNhatTienTrinh(ten))
+                .handleAsync((tin, sai) -> {
+                    if (!daDong) {
+                        dangGui = false;
+                        vungTruyenTep.setVisible(false);
+                        if (sai == null) {
+                            dieuKhien.daGui(dich, true);
+                            taiHoiThoai();
+                            if (Objects.equals(dich, doiPhuong)) {
+                                lichSuModel.ghiNhanTin(tin);
+                                if (Objects.equals(maTraLoi(), traLoi)) {
+                                    boTraLoi();
+                                }
+                                veTin(true);
+                            }
+                        }
+                        capNhatTepChon();
+                    }
+                    if (sai != null) {
+                        throw new CompletionException(sai);
+                    }
+                    return null;
+                }, Platform::runLater);
+    }
+
     private void guiTep() {
-        if (dangGui || daDong) {
+        if (trangThaiGui.get() != TrangThaiGui.binhThuong || dangGui || daDong) {
             return;
         }
         if (dieuKhien.dangTruyen()) {
@@ -1278,7 +1471,7 @@ public final class HoiThoaiView extends BorderPane {
                     dangGui = false;
                     vungTruyenTep.setVisible(false);
                     if (sai == null) {
-                        dieuKhien.daGui(dich, false);
+                        dieuKhien.daGui(dich, true);
                         taiHoiThoai();
                         if (Objects.equals(dich, doiPhuong)) {
                             lichSuModel.ghiNhanTin(tin);
@@ -1504,6 +1697,7 @@ public final class HoiThoaiView extends BorderPane {
     }
 
     public void dong() {
+        ghiAm.huy();
         dieuKhienGoiThoai.dong();
         dieuKhienAnh.dong();
         if (manHinhHoSo != null) {

@@ -124,8 +124,33 @@ public final class HoSoView extends BorderPane {
         noiDung.getChildren().addAll(DoHoaView.nhan("HỒ SƠ CÁ NHÂN", "nhanHoSo"), dau, sua,
                 muc("Số điện thoại", DuLieu.chu(hoSo, "soDienThoai")),
                 muc("Giới thiệu", DuLieu.chu(hoSo, "gioiThieu")),
-                muc("Ngày tham gia", DuLieu.chu(hoSo, "thamGia")), new Separator(), riengTu, doi, chuyen,
+                muc("Ngày tham gia", DuLieu.chu(hoSo, "thamGia")), new Separator(), luaChonGiaoDien(),
+                riengTu, doi, chuyen,
                 thongBao);
+    }
+
+    private VBox luaChonGiaoDien() {
+        ToggleGroup nhom = new ToggleGroup();
+        RadioButton sang = new RadioButton("Sáng");
+        RadioButton toi = new RadioButton("Tối");
+        for (RadioButton nut : new RadioButton[]{sang, toi}) {
+            nut.getStyleClass().add("luaChonQuyen");
+            nut.setToggleGroup(nhom);
+            nut.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(nut, Priority.ALWAYS);
+        }
+        nhom.selectToggle(DoHoaView.giaoDienToi() ? toi : sang);
+        sang.setOnAction(e -> doiGiaoDien(false));
+        toi.setOnAction(e -> doiGiaoDien(true));
+        return new VBox(8, DoHoaView.nhan("Giao diện", "nhanHoSo"), new HBox(8, sang, toi));
+    }
+
+    private void doiGiaoDien(boolean toi) {
+        if (DoHoaView.doiGiaoDien(getScene(), toi)) {
+            thongBao.setText("");
+        } else {
+            thongBao.setText("Đã đổi giao diện cho phiên này. Chưa lưu được lựa chọn vào máy.");
+        }
     }
 
     private VBox muc(String ten, String giaTri) {

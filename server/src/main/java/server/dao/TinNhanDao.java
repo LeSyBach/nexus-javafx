@@ -223,27 +223,54 @@ public final class TinNhanDao {
         }
     }
 
-    /**
-     * Gom theo doi phuong; chi doc du lieu cua tai khoan da xac thuc.
-     */
-    public boolean daChan(long nguoi, long dich) throws SQLException {
-        try (Connection db = csdl.moKetNoi(); PreparedStatement lenh = db.prepareStatement(
-                "SELECT 1 FROM nguoi_bi_chan WHERE nguoi_dung_id=? AND doi_phuong_id=?")) {
+    public record TrangThaiChan(boolean daChan, boolean biChan) {
+    }
+
+    public TrangThaiChan trangThaiChan(long nguoi, long dich) throws SQLException {
+        try (Connection db = csdl.moKetNoi()) {
+            return docTrangThaiChan(db, nguoi, dich);
+        }
+    }
+
+    private static TrangThaiChan docTrangThaiChan(Connection db, long nguoi, long dich) throws SQLException {
+        String sql = """
+                SELECT EXISTS (SELECT 1 FROM nguoi_bi_chan WHERE nguoi_dung_id=? AND doi_phuong_id=?) AS da_chan,
+                       EXISTS (SELECT 1 FROM nguoi_bi_chan WHERE nguoi_dung_id=? AND doi_phuong_id=?) AS bi_chan
+                """;
+        try (PreparedStatement lenh = db.prepareStatement(sql)) {
             lenh.setLong(1, nguoi);
             lenh.setLong(2, dich);
+            lenh.setLong(3, dich);
+            lenh.setLong(4, nguoi);
             try (ResultSet dong = lenh.executeQuery()) {
-                return dong.next();
+                dong.next();
+                return new TrangThaiChan(dong.getBoolean("da_chan"), dong.getBoolean("bi_chan"));
             }
         }
     }
 
-    public void datChan(long nguoi, long dich, boolean chan) throws SQLException {
-        String sql = chan ? "INSERT IGNORE INTO nguoi_bi_chan VALUES (?,?)" :
-                "DELETE FROM nguoi_bi_chan WHERE nguoi_dung_id=? AND doi_phuong_id=?";
-        try (Connection db = csdl.moKetNoi(); PreparedStatement lenh = db.prepareStatement(sql)) {
-            lenh.setLong(1, nguoi);
-            lenh.setLong(2, dich);
-            lenh.executeUpdate();
+    public TrangThaiChan datChan(long nguoi, long dich, boolean chan) throws SQLException {
+        String sql = chan
+                ? """
+                INSERT INTO nguoi_bi_chan (nguoi_dung_id, doi_phuong_id) VALUES (?,?)
+                ON DUPLICATE KEY UPDATE doi_phuong_id=VALUES(doi_phuong_id)
+                """
+                : "DELETE FROM nguoi_bi_chan WHERE nguoi_dung_id=? AND doi_phuong_id=?";
+        try (Connection db = csdl.moKetNoi()) {
+            db.setAutoCommit(false);
+            try {
+                try (PreparedStatement lenh = db.prepareStatement(sql)) {
+                    lenh.setLong(1, nguoi);
+                    lenh.setLong(2, dich);
+                    lenh.executeUpdate();
+                }
+                TrangThaiChan trangThai = docTrangThaiChan(db, nguoi, dich);
+                db.commit();
+                return trangThai;
+            } catch (SQLException | RuntimeException loi) {
+                db.rollback();
+                throw loi;
+            }
         }
     }
 

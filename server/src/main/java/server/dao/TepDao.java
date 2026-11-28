@@ -52,6 +52,7 @@ public final class TepDao {
                         !TuongTacTinNhanDao.bamChu(thongTin.noiDung())
                                 .equals(dong.getString("bam_noi_dung")) ||
                         !dong.getString("ten_tep").equals(thongTin.ten()) ||
+                        thongTin.tinThoai() != "thoai".equals(dong.getString("loai_tep")) ||
                         dong.getLong("kich_thuoc") != thongTin.kichThuoc() ||
                         !dong.getString("sha256").equals(thongTin.sha())) {
                     throw new LoiNghiepVuModel("maGuiDaDung", "Mã gửi đã dùng cho tin khác.");
@@ -117,7 +118,7 @@ public final class TepDao {
                     them.setString(3, thongTin.ten());
                     them.setLong(4, thongTin.kichThuoc());
                     them.setString(5, thongTin.sha());
-                    them.setString(6, loai);
+                    them.setString(6, thongTin.tinThoai() ? "thoai" : loai);
                     them.setBytes(7, anhThu);
                     them.executeUpdate();
                 }
@@ -156,11 +157,11 @@ public final class TepDao {
         }
     }
 
-    public record TepDaLuu(String ma, long kichThuoc, String sha, String ten, byte[] anhThu) {
+    public record TepDaLuu(String ma, long kichThuoc, String sha, String ten, String loai, byte[] anhThu) {
     }
 
     public TepDaLuu docTepDuocPhep(long nguoiDung, long tinId, boolean layAnh) throws SQLException {
-        String sql = "SELECT p.ma_luu,p.ten_tep,p.kich_thuoc,p.sha256" + (layAnh ? ",p.anh_thu" : "") +
+        String sql = "SELECT p.ma_luu,p.ten_tep,p.kich_thuoc,p.sha256,p.loai_tep" + (layAnh ? ",p.anh_thu" : "") +
                 " FROM tep_dinh_kem p JOIN tin_nhan t ON t.id=p.tin_nhan_id WHERE t.id=? AND t.da_thu_hoi=FALSE AND (t.nguoi_nhan_id IS NULL OR t.nguoi_gui_id=? OR t.nguoi_nhan_id=?) AND NOT EXISTS (SELECT 1 FROM tin_da_an a WHERE a.nguoi_dung_id=? AND a.tin_nhan_id=t.id)";
         try (Connection db = csdl.moKetNoi(); PreparedStatement tim = db.prepareStatement(sql)) {
             tim.setLong(1, tinId);
@@ -173,7 +174,7 @@ public final class TepDao {
                             "Tệp không tồn tại hoặc bạn không thuộc cuộc trò chuyện.");
                 }
                 return new TepDaLuu(dong.getString("ma_luu"), dong.getLong("kich_thuoc"),
-                        dong.getString("sha256"), dong.getString("ten_tep"),
+                        dong.getString("sha256"), dong.getString("ten_tep"), dong.getString("loai_tep"),
                         layAnh ? dong.getBytes("anh_thu") : null);
             }
         }

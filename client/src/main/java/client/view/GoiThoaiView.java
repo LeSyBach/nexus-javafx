@@ -7,6 +7,7 @@ import javafx.animation.Timeline;
 import javafx.css.PseudoClass;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -20,6 +21,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -28,7 +30,8 @@ import java.io.ByteArrayInputStream;
 import java.util.concurrent.TimeUnit;
 
 /** Cửa sổ gọi thoại riêng, dùng lại cùng controller và phiên âm thanh. */
-final class GoiThoaiView extends BorderPane {
+final class GoiThoaiView extends StackPane {
+    private static final PseudoClass CO_VIDEO = PseudoClass.getPseudoClass("co-video");
     private final Node manHinhChat;
     private final Label ten = DoHoaView.nhan("", "tenNguoiGoi");
     private final Label trangThai = DoHoaView.nhan("", "trangThaiCuocGoi");
@@ -44,8 +47,6 @@ final class GoiThoaiView extends BorderPane {
     private final VBox giua = new VBox(14);
     private final ImageView anhDoiPhuong = new ImageView();
     private final ImageView anhCuaMinh = new ImageView();
-    private final Label choAnhCuaMinh = DoHoaView.nhan("Camera chưa bật", "nhanNutGoi");
-    private final VBox xemTruoc = new VBox(6);
     private final StackPane vungHinh = new StackPane();
     private final Label nhanMic = DoHoaView.nhan("Tắt mic", "nhanNutGoi");
     private final Label nhanKetThuc = DoHoaView.nhan("Cúp máy", "nhanNutGoi");
@@ -70,7 +71,7 @@ final class GoiThoaiView extends BorderPane {
         HBox dau = new HBox(12, thuongHieu, khoang, thoiLuong);
         dau.setAlignment(Pos.CENTER_LEFT);
         dau.setPadding(new Insets(24, 28, 0, 28));
-        setTop(dau);
+        dau.getStyleClass().add("dauCuocGoi");
         anhDaiDien.getStyleClass().add("vongAnhCuocGoi");
         anhDaiDien.setMinSize(164, 164);
         anhDaiDien.setPrefSize(164, 164);
@@ -85,22 +86,29 @@ final class GoiThoaiView extends BorderPane {
         giua.setAlignment(Pos.CENTER);
         giua.setPadding(new Insets(32));
         VBox.setMargin(ten, new Insets(18, 0, 0, 0));
-        anhDoiPhuong.setPreserveRatio(true);
-        anhDoiPhuong.fitWidthProperty().bind(vungHinh.widthProperty().subtract(16));
-        anhDoiPhuong.fitHeightProperty().bind(vungHinh.heightProperty().subtract(16));
+        anhDoiPhuong.setManaged(false);
+        anhDoiPhuong.setMouseTransparent(true);
+        anhDoiPhuong.fitWidthProperty().bind(widthProperty());
+        anhDoiPhuong.fitHeightProperty().bind(heightProperty());
+        widthProperty().addListener((o, cu, moi) -> canhKhungVideo());
+        heightProperty().addListener((o, cu, moi) -> canhKhungVideo());
         anhCuaMinh.setPreserveRatio(true);
         anhCuaMinh.setFitWidth(96);
         anhCuaMinh.setFitHeight(72);
-        StackPane oXemTruoc = new StackPane(anhCuaMinh, choAnhCuaMinh);
-        oXemTruoc.setMinSize(96, 72);
-        xemTruoc.getChildren().addAll(oXemTruoc, DoHoaView.nhan("Bạn", "nhanNutGoi"));
-        xemTruoc.setMaxSize(114, 108);
-        xemTruoc.setAlignment(Pos.CENTER);
-        xemTruoc.getStyleClass().add("xemTruocVideo");
-        StackPane.setAlignment(xemTruoc, Pos.TOP_RIGHT);
-        StackPane.setMargin(xemTruoc, new Insets(16));
-        vungHinh.getChildren().addAll(anhDoiPhuong, giua, xemTruoc);
-        setCenter(vungHinh);
+        anhCuaMinh.setAccessibleText("Hình camera của bạn");
+        Rectangle gocCamera = new Rectangle(anhCuaMinh.getFitWidth(), anhCuaMinh.getFitHeight());
+        gocCamera.setArcWidth(26);
+        gocCamera.setArcHeight(26);
+        anhCuaMinh.setClip(gocCamera);
+        StackPane khungCamera = new StackPane(anhCuaMinh);
+        khungCamera.getStyleClass().add("khungCamera");
+        khungCamera.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+        khungCamera.setMouseTransparent(true);
+        khungCamera.visibleProperty().bind(anhCuaMinh.imageProperty().isNotNull());
+        khungCamera.managedProperty().bind(khungCamera.visibleProperty());
+        StackPane.setAlignment(khungCamera, Pos.TOP_RIGHT);
+        StackPane.setMargin(khungCamera, new Insets(16));
+        vungHinh.getChildren().addAll(giua, khungCamera);
         HBox thaoTac = new HBox(24, vungMic, vungCamera, vungKetThuc, vungBatMay);
         thaoTac.setAlignment(Pos.CENTER);
         thaoTac.getStyleClass().add("thaoTacCuocGoi");
@@ -109,7 +117,8 @@ final class GoiThoaiView extends BorderPane {
         loiVideo.managedProperty().bind(loiVideo.visibleProperty());
         VBox chan = new VBox(8, loiVideo, thaoTac);
         chan.setAlignment(Pos.CENTER);
-        setBottom(chan);
+        BorderPane lopDieuKhien = new BorderPane(vungHinh, dau, null, chan, null);
+        getChildren().addAll(anhDoiPhuong, lopDieuKhien);
         thoiLuong.setId("thoiLuongGoiThoai");
         thoiLuong.managedProperty().bind(thoiLuong.visibleProperty());
         thoiLuong.setVisible(false);
@@ -143,7 +152,6 @@ final class GoiThoaiView extends BorderPane {
         veNguoiGoi(duLieu.tenDoiPhuong());
         loiVideo.setText(duLieu.thongBaoVideo());
         loiVideo.setVisible(!duLieu.thongBaoVideo().isEmpty() && dangGoi);
-        xemTruoc.setVisible(duLieu.goiVideo() && dangGoi && anhCuaMinh.getImage() != null);
         vungCamera.setVisible(duLieu.goiVideo() && dangGoi);
         camera.setGraphic(BieuTuongView.video(duLieu.tatCamera()));
         camera.pseudoClassStateChanged(PseudoClass.getPseudoClass("micTat"), duLieu.tatCamera());
@@ -205,21 +213,40 @@ final class GoiThoaiView extends BorderPane {
         }
         if (hinh.cuaMinh()) {
             anhCuaMinh.setImage(anh);
-            xemTruoc.setVisible(anh != null);
-            choAnhCuaMinh.setVisible(anh == null);
-            choAnhCuaMinh.setText(anh == null ? "Camera chưa bật" : "");
         } else {
-            anhDoiPhuong.setImage(anh);
-            giua.setVisible(anh == null);
+            hienVideoDoiPhuong(anh);
         }
     }
 
     private void xoaHinh() {
-        anhDoiPhuong.setImage(null);
+        hienVideoDoiPhuong(null);
         anhCuaMinh.setImage(null);
-        xemTruoc.setVisible(false);
-        giua.setVisible(true);
-        choAnhCuaMinh.setVisible(true);
+    }
+
+    private void hienVideoDoiPhuong(Image anh) {
+        Image cu = anhDoiPhuong.getImage();
+        anhDoiPhuong.setImage(anh);
+        boolean coVideo = anh != null;
+        if (!coVideo || cu == null || cu.getWidth() != anh.getWidth() || cu.getHeight() != anh.getHeight()) {
+            canhKhungVideo();
+        }
+        giua.setVisible(!coVideo);
+        pseudoClassStateChanged(CO_VIDEO, coVideo);
+    }
+
+    private void canhKhungVideo() {
+        Image anh = anhDoiPhuong.getImage();
+        if (anh == null || getWidth() <= 0 || getHeight() <= 0) {
+            anhDoiPhuong.setViewport(null);
+            return;
+        }
+
+        // Cắt đều hai bên hoặc trên dưới theo tỷ lệ cửa sổ, giữ nguyên tỷ lệ hình.
+        double tiLe = getWidth() / getHeight();
+        double rong = Math.min(anh.getWidth(), anh.getHeight() * tiLe);
+        double cao = Math.min(anh.getHeight(), anh.getWidth() / tiLe);
+        anhDoiPhuong.setViewport(new Rectangle2D(
+                (anh.getWidth() - rong) / 2, (anh.getHeight() - cao) / 2, rong, cao));
     }
 
     private void taoCuaSo() {

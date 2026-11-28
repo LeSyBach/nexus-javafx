@@ -1,0 +1,43 @@
+.root {
+    -nexus-nen: #141c18;
+    -nexus-nen-chat: #151d19;
+    -nexus-nen-danh-sach: #1b2520;
+    -nexus-mat: #222e27;
+    -nexus-mat-phu: #2a3a31;
+    -nexus-dieu-huong: #1e2c25;
+    -nexus-nut-phu: #304438;
+    -nexus-khi-re: #3b5043;
+    -nexus-da-chon: #385645;
+    -nexus-vien: #3d5144;
+    -nexus-thanh-cuon: #4d6656;
+    -nexus-nut-chinh: #286748;
+    -nexus-nut-chinh-re: #337c55;
+    -nexus-nhan-manh: #8cd7ad;
+    -nexus-tieu-diem: #a5d8b7;
+    -nexus-tieu-diem-phu: #e0ac78;
+    -nexus-avata-xanh: #365341;
+    -nexus-avata-nau: #554637;
+    -nexus-avata-oliu: #464d35;
+    -nexus-nen-canh-bao: #463728;
+    -nexus-nen-nguy-hiem: #533a37;
+    -nexus-chu: #e5efe8;
+    -nexus-chu-phu: #adbfaf;
+    -nexus-chu-nhap: #99b09e;
+    -nexus-chu-xanh: #9bddb7;
+    -nexus-chu-canh-bao: #e9bc90;
+    -nexus-chu-nguy-hiem: #ffaea6;
+    -nexus-bieu-tuong: #a8d3b8;
+    -nexus-lien-ket: #8bdfc4;
+    -nexus-vien-lien-ket: #578373;
+}
+
+.root {
+    -fx-base: -nexus-mat;
+    -fx-background: -nexus-nen;
+    -fx-control-inner-background: -nexus-mat;
+    -fx-control-inner-background-alt: -nexus-mat-phu;
+    -fx-text-background-color: -nexus-chu;
+    -fx-accent: #387855;
+}
+.menu-item > .label, .titled-pane > .title > .text { -fx-text-fill: -nexus-chu; }
+.menu-item:focused > .label { -fx-text-fill: white; }

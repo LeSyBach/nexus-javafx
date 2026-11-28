@@ -13,7 +13,9 @@ import javafx.scene.image.*;
 import javafx.scene.layout.*;
 
 import java.io.ByteArrayInputStream;
-import java.util.function.Consumer;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 /**
  * Ảnh tự hiện trong chat; các tệp thông thường giữ tên và nút tải.
@@ -26,12 +28,15 @@ final class TheTepView extends VBox {
     private boolean daYeuCau, daHenTai, daHienAnh;
     private final InvalidationListener khiDoiViTri = giaTri -> henTaiAnh();
 
-    TheTepView(JsonObject tin, Consumer<JsonObject> khiTai, AnhTinNhanController dieuKhienAnh) {
+    TheTepView(JsonObject tin, AnhTinNhanController dieuKhienAnh,
+               Function<String, CompletableFuture<Path>> taiTinThoai) {
         this.dieuKhienAnh = dieuKhienAnh;
         this.id = DuLieu.chu(tin, "id");
         JsonObject tep = tin.getAsJsonObject("tep");
         String ten = DuLieu.chu(tep, "tenTep");
-        boolean laAnh = DuLieu.chu(tep, "loaiTep").equals("anh");
+        String loaiTep = DuLieu.chu(tep, "loaiTep");
+        boolean laAnh = loaiTep.equals("anh");
+        boolean laThoai = loaiTep.equals("thoai");
         getStyleClass().add("theTep");
         setSpacing(10);
         setMaxWidth(430);
@@ -54,6 +59,11 @@ final class TheTepView extends VBox {
                     henTaiAnh();
                 }
             });
+        } else if (laThoai) {
+            HBox hangThoai = new HBox(12, DoHoaView.nhan("Tin nhắn thoại", "tenTep"),
+                    new PhatThoaiView("Phát", () -> taiTinThoai.apply(id), true));
+            hangThoai.setAlignment(Pos.CENTER_LEFT);
+            getChildren().add(hangThoai);
         } else {
             Label nhanTen = DoHoaView.nhan(ten, "tenTep");
             nhanTen.setWrapText(true);
@@ -61,19 +71,17 @@ final class TheTepView extends VBox {
             getChildren().add(nhanTen);
         }
         String chu = DuLieu.chu(tin, "noiDung");
-        if (!chu.equals("Tệp: " + ten)) {
-            Label chuThich = DoHoaView.nhan(chu, "chuThichTep");
-            chuThich.setWrapText(true);
-            chuThich.setMaxWidth(laAnh ? 308 : 380);
-            getChildren().add(chuThich);
+        String chuMacDinh = laThoai ? "Tin nhắn thoại" : "Tệp: " + ten;
+        if (!chu.isBlank() && !chu.equals(chuMacDinh)) {
+            getChildren().add(NoiDungTinView.tao(chu, "chuThichTep", laAnh ? 308 : 380, true));
         }
-        Label kichThuoc =
-                DoHoaView.nhan(TruyenTepTCP.dungLuong(tep.get("kichThuoc").getAsLong()), "moTaTep");
-        HBox chan = new HBox(12, kichThuoc);
-        chan.setAlignment(Pos.CENTER_LEFT);
-        getChildren().add(chan);
-        setAccessibleText(laAnh ? "Ảnh trong cuộc trò chuyện. " + (chu.equals("Tệp: " + ten) ? "" : chu) :
-                "Tệp " + ten);
+        if (!laThoai) {
+            Label kichThuoc = DoHoaView.nhan(
+                    TruyenTepTCP.dungLuong(tep.get("kichThuoc").getAsLong()), "moTaTep");
+            getChildren().add(kichThuoc);
+        }
+        setAccessibleText(laAnh ? "Ảnh trong cuộc trò chuyện. " + (chu.equals(chuMacDinh) ? "" : chu)
+                : laThoai ? "Tin nhắn thoại" : "Tệp " + ten);
     }
 
     private void hienDangTai() {

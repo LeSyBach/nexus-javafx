@@ -10,6 +10,7 @@ import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 
+import java.nio.file.Path;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
@@ -22,7 +23,8 @@ import java.util.concurrent.CompletableFuture;
 final class BongTinNhanView extends VBox {
     BongTinNhanView(JsonObject tin, String idMinh, Consumer<JsonObject> traLoi,
                     BiFunction<String, JsonObject, CompletableFuture<Void>> thaoTac,
-                    Consumer<JsonObject> taiTep, AnhTinNhanController dieuKhienAnh) {
+                    Consumer<JsonObject> taiTep, AnhTinNhanController dieuKhienAnh,
+                    Function<String, CompletableFuture<Path>> taiTinThoai) {
         boolean cuaMinh = DuLieu.chu(tin, "nguoiGuiId").equals(idMinh);
         boolean daThu = LichSuTinNhanModel.daThuHoi(tin);
 
@@ -37,13 +39,12 @@ final class BongTinNhanView extends VBox {
             getChildren().add(new TrichDanTinView(tin.getAsJsonObject("trichDan"), dieuKhienAnh));
         }
 
-        Label chu = DoHoaView.nhan(DuLieu.chu(tin, "noiDung"), cuaMinh ? "bongTinMinh" : "bongTinBan");
-        chu.setWrapText(true);
-        chu.setMaxWidth(440);
+        Node chu = NoiDungTinView.tao(DuLieu.chu(tin, "noiDung"), cuaMinh ? "bongTinMinh" : "bongTinBan",
+                440, !daThu);
         if (daThu) {
             chu.getStyleClass().add("tinDaThuHoi");
         }
-        Node noiDung = !daThu && tin.has("tep") ? new TheTepView(tin, taiTep, dieuKhienAnh) : chu;
+        Node noiDung = !daThu && tin.has("tep") ? new TheTepView(tin, dieuKhienAnh, taiTinThoai) : chu;
         getChildren().add(noiDung);
 
         String gio = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())

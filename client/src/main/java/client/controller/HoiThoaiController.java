@@ -41,7 +41,8 @@ public final class HoiThoaiController {
 
     public enum LoaiSuKien {
         danhSachNguoi, nhomCapNhat, tinMoi, tinCapNhat, tinBiXoa, ghimCapNhat, doiPhuongDaDoc,
-        danhSachThayDoi, hoiThoaiBiXoa, banBeCapNhat, hoSoCapNhat, cuocGoiDen, cuocGoiBatDau, cuocGoiKetThuc
+        danhSachThayDoi, hoiThoaiBiXoa, banBeCapNhat, hoSoCapNhat, trangThaiChanDoi,
+        cuocGoiDen, cuocGoiBatDau, cuocGoiKetThuc
     }
 
     public record SuKien(LoaiSuKien loai, JsonObject duLieu) {
@@ -74,6 +75,7 @@ public final class HoiThoaiController {
             case "hoiThoaiBiXoa" -> LoaiSuKien.hoiThoaiBiXoa;
             case "banBeDoi" -> LoaiSuKien.banBeCapNhat;
             case "hoSoDoi" -> LoaiSuKien.hoSoCapNhat;
+            case "chanNguoiDungDoi" -> LoaiSuKien.trangThaiChanDoi;
             case "cuocGoiDen" -> LoaiSuKien.cuocGoiDen;
             case "cuocGoiBatDau" -> LoaiSuKien.cuocGoiBatDau;
             case "cuocGoiKetThuc" -> LoaiSuKien.cuocGoiKetThuc;
@@ -166,11 +168,6 @@ public final class HoiThoaiController {
         return kenh.yeuCau("xoaHoiThoai", DuLieu.tao("nguoiNhanId", dich));
     }
 
-    public CompletableFuture<JsonObject> chan(String dich, boolean chan) {
-        return kenh.yeuCau(chan ? "chanNguoiDung" : "boChanNguoiDung",
-                DuLieu.tao("nguoiNhanId", dich));
-    }
-
     private String khoaGui(String dich, boolean tep) {
         return tep ? "tep:" + (dich == null ? "chung" : dich) : dich == null ? "phongChung" : dich;
     }
@@ -205,10 +202,20 @@ public final class HoiThoaiController {
 
     public CompletableFuture<JsonObject> guiTep(Path tep, String dich, String chu, String traLoi,
                                                 DoubleConsumer tienTrinh) {
+        return guiTep(tep, dich, chu, traLoi, false, tienTrinh);
+    }
+
+    public CompletableFuture<JsonObject> guiTinThoai(Path tep, String dich, String traLoi,
+                                                     DoubleConsumer tienTrinh) {
+        return guiTep(tep, dich, "", traLoi, true, tienTrinh);
+    }
+
+    private CompletableFuture<JsonObject> guiTep(Path tep, String dich, String chu, String traLoi,
+                                                  boolean tinThoai, DoubleConsumer tienTrinh) {
         String dau =
                 tep.toAbsolutePath() + ":" + tep.toFile().length() + ":" + tep.toFile().lastModified() + ":" +
-                        DuLieu.tao("chu", chu, "traLoi", traLoi);
-        return truyenTep.gui(tep, dich, chu, maGui(khoaGui(dich, true), dau), traLoi, tienTrinh);
+                        DuLieu.tao("chu", chu, "traLoi", traLoi, "tinThoai", tinThoai);
+        return truyenTep.gui(tep, dich, chu, maGui(khoaGui(dich, true), dau), traLoi, tinThoai, tienTrinh);
     }
 
     public void daGui(String dich, boolean tep) {
@@ -217,6 +224,10 @@ public final class HoiThoaiController {
 
     public CompletableFuture<Path> taiTep(String id, Path dich, DoubleConsumer tienTrinh) {
         return truyenTep.tai(id, dich, tienTrinh);
+    }
+
+    public CompletableFuture<Path> taiTinThoai(String id) {
+        return truyenTep.taiTam(id);
     }
 
     public boolean dangTruyen() {

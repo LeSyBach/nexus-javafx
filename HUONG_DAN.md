@@ -197,7 +197,7 @@ Trong Thông tin, bấm Lưu trữ cuộc trò chuyện để chuyển chat riê
 
 Bấm tên ở đầu chat để mở bảng thông tin bên phải. Kho ảnh, tệp và liên kết có bản xem trước. Mục Lưu trữ nằm ở thanh menu bên trái. Chuột phải vào hội thoại để lưu trữ hoặc bỏ lưu trữ.
 
-Ở cuối bảng thông tin chat riêng có Chặn và Xóa cuộc trò chuyện. Chặn ngăn hai tài khoản gửi tin riêng cho nhau. Xóa chỉ ẩn lịch sử hiện có ở phía tài khoản thao tác. Khi chuyển máy, áp dụng thêm migration `012_chan_nguoi_dung.sql`.
+Mở chat riêng, bấm tên người kia rồi kéo xuống cuối bảng thông tin hội thoại. **Chặn** nằm cạnh **Xóa cuộc trò chuyện**. Khi chặn, cả hai bên mất ô nhập tin và không thể gọi cho nhau. Bên bị chặn thấy **Không thể gửi tin nhắn**. Bên chặn có thể bấm **Bỏ chặn** ngay trong hội thoại. Xóa cuộc trò chuyện chỉ ẩn lịch sử hiện có ở phía tài khoản thao tác. Khi chuyển máy, áp dụng thêm migration `012_chan_nguoi_dung.sql`.
 
 ### Chat nhóm
 
@@ -216,6 +216,10 @@ Nhập `015_lich_su_cuoc_goi.sql` sau migration 014 bằng tài khoản quản t
 Client dùng webcam-capture 0.3.12 để truy cập camera. Phần chia JPEG 320×240 thành gói, truyền bằng DatagramSocket, kiểm tra token phiên, ghép gói đến lệch thứ tự và bỏ khung cũ nằm ở `KhungHinhUDP` và `VideoUDP`. Tốc độ gửi mục tiêu khoảng 12 khung/giây, âm thanh chạy trên socket UDP riêng. Khi camera không sẵn sàng, cửa sổ báo lỗi và vẫn giữ âm thanh. TCP trao đổi cổng video sau khi bắt máy. Lịch sử lưu loại cuộc gọi để nút Gọi lại chọn đúng thoại hoặc video.
 
 Đây là bản truyền JPEG qua UDP cho LAN. Chất lượng cần kiểm tra trên hai máy thật, chưa có codec video thích nghi hoặc kết nối qua NAT cho hai mạng Internet khác nhau.
+
+### Tin nhắn thoại
+
+Áp dụng `017_tin_nhan_thoai.sql` sau migration 016, biên dịch rồi khởi động lại server và client. Trong chat riêng hoặc phòng chat chung, bấm biểu tượng micro ở ô soạn. Bản ghi tối đa 60 giây. Bấm **Dừng** để nghe lại, bỏ hoặc gửi. Người nhận chọn **Phát** ngay trong tin nhắn.
 
 ### Cấu trúc MVC
 

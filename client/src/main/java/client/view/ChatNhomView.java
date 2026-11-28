@@ -167,9 +167,7 @@ final class ChatNhomView extends BorderPane {
             return;
         }
         boolean minh = toi.equals(DuLieu.chu(tin, "nguoiGuiId"));
-        Label chu = DoHoaView.nhan(DuLieu.chu(tin, "noiDung"), minh ? "bongTinMinh" : "bongTinBan");
-        chu.setWrapText(true);
-        chu.setMaxWidth(450);
+        Node chu = NoiDungTinView.tao(DuLieu.chu(tin, "noiDung"), minh ? "bongTinMinh" : "bongTinBan", 450, true);
         String gio = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
                 .format(Instant.parse(DuLieu.chu(tin, "taoLuc")));
         Label moc =

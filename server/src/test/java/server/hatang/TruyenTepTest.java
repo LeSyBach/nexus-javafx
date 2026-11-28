@@ -11,6 +11,10 @@ import org.junit.jupiter.api.io.TempDir;
 import com.google.gson.*;
 import giaothuc.*;
 
+import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
 import java.io.*;
 import java.net.*;
 import java.nio.file.*;
@@ -105,7 +109,13 @@ class TruyenTepTest {
     }
 
     JsonObject guiTep(byte[] data, String ten, String ma) throws Exception {
-        dung(cacMay.get(0).gui("tepBatDau", thongTin(data, ten, ma)));
+        JsonObject tra = guiTep(data, thongTin(data, ten, ma));
+        dung(tra);
+        return tra.getAsJsonObject("tinNhan");
+    }
+
+    JsonObject guiTep(byte[] data, JsonObject meta) throws Exception {
+        dung(cacMay.get(0).gui("tepBatDau", meta));
         for (int i = 0; i < data.length; i += TepModel.kichThuocKhoi) {
             int so = Math.min(TepModel.kichThuocKhoi, data.length - i);
             JsonObject tra = cacMay.get(0).gui("tepGuiKhoi",
@@ -114,9 +124,7 @@ class TruyenTepTest {
             dung(tra);
             assertEquals(Integer.toString(i + so), DuLieu.chu(tra, "daNhan"));
         }
-        JsonObject tra = cacMay.get(0).gui("tepKetThuc", new JsonObject());
-        dung(tra);
-        return tra.getAsJsonObject("tinNhan");
+        return cacMay.get(0).gui("tepKetThuc", new JsonObject());
     }
 
     byte[] tai(MayThu m, String tinId) throws Exception {
@@ -210,6 +218,75 @@ class TruyenTepTest {
         dung(cacMay.get(0).gui("tepBatDau", meta));
         sai(cacMay.get(0).gui("tepKetThuc", new JsonObject()));
         assertEquals(0, soPart());
+    }
+
+    @Test
+    void tinThoaiGiuLoaiVaDuLieuQuaLichSuVaChuyenTiep() throws Exception {
+        byte[] wav = taoWav();
+        JsonObject meta = thongTin(wav, "ghi-am.wav", UUID.randomUUID().toString());
+        meta.addProperty("tinThoai", true);
+
+        JsonObject tra = guiTep(wav, meta);
+        dung(tra);
+        JsonObject tin = tra.getAsJsonObject("tinNhan");
+        String tinId = DuLieu.chu(tin, "id");
+        kiemTraTinThoai(tin);
+
+        MayThu nguoiNhan = cacMay.get(1);
+        MayThu nguoiThuBa = cacMay.get(2);
+        assertArrayEquals(wav, tai(nguoiNhan, tinId));
+        assertEquals("khongCoQuyenTai", DuLieu.chu(
+                nguoiThuBa.gui("tepThongTin", DuLieu.tao("tinNhanId", tinId)), "maLoi"));
+
+        JsonObject lichSu = nguoiNhan.gui("lichSu", DuLieu.tao("nguoiNhanId", id.get(0)));
+        dung(lichSu);
+        JsonObject tinLuu = lichSu.getAsJsonArray("tinNhan").asList().stream()
+                .map(JsonElement::getAsJsonObject)
+                .filter(muc -> DuLieu.chu(muc, "id").equals(tinId))
+                .findFirst().orElseThrow();
+        kiemTraTinThoai(tinLuu);
+
+        JsonObject chuyenTiep = nguoiNhan.gui("chuyenTiepTin",
+                DuLieu.tao("tinNhanId", tinId, "nguoiNhanId", id.get(2), "maGui", UUID.randomUUID().toString()));
+        dung(chuyenTiep);
+        JsonObject tinMoi = chuyenTiep.getAsJsonObject("tinNhan");
+        kiemTraTinThoai(tinMoi);
+        assertArrayEquals(wav, tai(nguoiThuBa, DuLieu.chu(tinMoi, "id")));
+    }
+
+    @Test
+    void tinThoaiSaiDinhDangBiTuChoiVaDonTepTam() throws Exception {
+        byte[] saiDinhDang = taoWav();
+        saiDinhDang[0] = 0;
+        JsonObject meta = thongTin(saiDinhDang, "ghi-am.wav", UUID.randomUUID().toString());
+        meta.addProperty("tinThoai", true);
+
+        JsonObject tra = guiTep(saiDinhDang, meta);
+        sai(tra);
+        assertEquals("tinThoaiSai", DuLieu.chu(tra, "maLoi"));
+        assertEquals(0, soPart());
+
+        JsonObject lichSu = cacMay.get(1).gui("lichSu", DuLieu.tao("nguoiNhanId", id.get(0)));
+        dung(lichSu);
+        assertFalse(lichSu.getAsJsonArray("tinNhan").asList().stream()
+                .map(JsonElement::getAsJsonObject)
+                .anyMatch(tin -> DuLieu.chu(tin, "maGui").equals(DuLieu.chu(meta, "maGui"))));
+    }
+
+    private static byte[] taoWav() throws IOException {
+        AudioFormat dinhDang = new AudioFormat(16000, 16, 1, true, false);
+        byte[] pcm = new byte[32000];
+        new Random(29).nextBytes(pcm);
+        try (var audio = new AudioInputStream(new ByteArrayInputStream(pcm), dinhDang, pcm.length / 2);
+             var wav = new ByteArrayOutputStream()) {
+            AudioSystem.write(audio, AudioFileFormat.Type.WAVE, wav);
+            return wav.toByteArray();
+        }
+    }
+
+    private static void kiemTraTinThoai(JsonObject tin) {
+        assertEquals("thoai", DuLieu.chu(tin.getAsJsonObject("tep"), "loaiTep"));
+        assertEquals("Tin nhắn thoại", DuLieu.chu(tin, "noiDung"));
     }
 
     @Test

@@ -416,6 +416,78 @@ class TuongTacTinNhanTest {
     }
 
     @Test
+    void trangThaiChanDongBoHaiChieuQuaNhieuPhienVaKhiKetNoiLai() throws Exception {
+        MayThu a = cacMay.get(0);
+        MayThu b = cacMay.get(1);
+        MayThu nguoiKhac = cacMay.get(2);
+        String idA = id.get(0);
+        String idB = id.get(1);
+        JsonObject dichA = DuLieu.tao("nguoiNhanId", idA);
+        JsonObject dichB = DuLieu.tao("nguoiNhanId", idB);
+
+        try (MayThu phienB = new MayThu(mayChu.cong())) {
+            dung(phienB.gui("dangNhap", DuLieu.tao("email", email.get(1), "matKhau", matKhau)));
+            dung(a.gui("chanNguoiDung", dichB));
+            kiemTraTrangThaiChan(a, idB, true, false);
+            kiemTraTrangThaiChan(b, idA, false, true);
+            kiemTraTrangThaiChan(phienB, idA, false, true);
+            kiemTraSuKienChan(a, idB, true, false);
+            kiemTraSuKienChan(b, idA, false, true);
+            kiemTraSuKienChan(phienB, idA, false, true);
+            kiemTraTrangThaiChan(nguoiKhac, idA, false, false);
+            assertTrue(nguoiKhac.suKien.stream().noneMatch(suKien -> suKien.loai().equals("chanNguoiDungDoi")));
+
+            try (MayThu ketNoiLai = new MayThu(mayChu.cong())) {
+                dung(ketNoiLai.gui("dangNhap", DuLieu.tao("email", email.get(0), "matKhau", matKhau)));
+                kiemTraTrangThaiChan(ketNoiLai, idB, true, false);
+            }
+
+            dung(b.gui("chanNguoiDung", dichA));
+            kiemTraTrangThaiChan(a, idB, true, true);
+            kiemTraTrangThaiChan(b, idA, true, true);
+            kiemTraSuKienChan(a, idB, true, true);
+            kiemTraSuKienChan(b, idA, true, true);
+
+            dung(a.gui("boChanNguoiDung", dichB));
+            kiemTraTrangThaiChan(a, idB, false, true);
+            kiemTraTrangThaiChan(b, idA, true, false);
+            kiemTraSuKienChan(a, idB, false, true);
+            kiemTraSuKienChan(b, idA, true, false);
+            sai(a.gui("guiTin", lenhTin(1, "Chưa thể gửi", UUID.randomUUID().toString(), null)),
+                    "khongTheNhanTin");
+
+            dung(b.gui("boChanNguoiDung", dichA));
+            kiemTraTrangThaiChan(a, idB, false, false);
+            kiemTraTrangThaiChan(b, idA, false, false);
+            kiemTraSuKienChan(a, idB, false, false);
+            kiemTraSuKienChan(b, idA, false, false);
+            guiTin(0, 1, "Đã gửi sau khi bỏ chặn", null);
+        } finally {
+            dung(a.gui("boChanNguoiDung", dichB));
+            dung(b.gui("boChanNguoiDung", dichA));
+        }
+    }
+
+    private static void kiemTraTrangThaiChan(MayThu may, String idDich, boolean daChan, boolean biChan)
+            throws IOException {
+        JsonObject ho = dung(may.gui("hoSoCongKhai", DuLieu.tao("nguoiDungId", idDich))).getAsJsonObject("hoSo");
+        assertEquals(daChan, ho.get("daChan").getAsBoolean());
+        assertEquals(biChan, ho.get("biChan").getAsBoolean());
+    }
+
+    private static void kiemTraSuKienChan(MayThu may, String idDich, boolean daChan, boolean biChan) {
+        List<ThongDiep> suKienChan = may.suKien.stream()
+                .filter(suKien -> suKien.loai().equals("chanNguoiDungDoi"))
+                .toList();
+        assertEquals(1, suKienChan.size());
+        JsonObject trangThai = suKienChan.get(0).duLieu();
+        assertEquals(new JsonPrimitive(idDich), trangThai.get("nguoiNhanId"));
+        assertEquals(new JsonPrimitive(daChan), trangThai.get("daChan"));
+        assertEquals(new JsonPrimitive(biChan), trangThai.get("biChan"));
+        may.suKien.remove(suKienChan.get(0));
+    }
+
+    @Test
     void quyenRiengTuDuocLocTaiMayChu() throws Exception {
         long chu = Long.parseLong(id.get(0)), ban = Long.parseLong(id.get(1));
         HoSoModel ho = new HoSoModel(kho);

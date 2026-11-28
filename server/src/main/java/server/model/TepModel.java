@@ -11,6 +11,10 @@ import java.sql.SQLException;
 import java.util.*;
 import javax.imageio.*;
 import javax.imageio.stream.*;
+import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.UnsupportedAudioFileException;
 import java.awt.image.BufferedImage;
 
 /**
@@ -19,6 +23,8 @@ import java.awt.image.BufferedImage;
 public final class TepModel {
     public static final int kichThuocKhoi = 24576;
     public static final long gioiHanTep = 10L * 1024 * 1024;
+    private static final int SO_KHUNG_THOAI = 16_000 * 60;
+    private static final long GIOI_HAN_TIN_THOAI = 2_000_000;
     private final TepDao tepDao;
     private final Path thuMuc;
     public TepModel(CSDLDao csdl, Path thuMuc) throws IOException {
@@ -28,7 +34,7 @@ public final class TepModel {
     }
 
     public record ThongTin(long nguoiGui, Long nguoiNhan, String maGui, String ten, long kichThuoc,
-                           String sha, String noiDung, Long traLoi) {
+                           String sha, String noiDung, Long traLoi, boolean tinThoai) {
     }
 
     public Path taoTam() throws IOException {
@@ -40,6 +46,11 @@ public final class TepModel {
                 DuLieu.chu(duLieu, "sha256"), noiDung = DuLieu.chu(duLieu, "noiDung").strip();
         long kichThuoc = so(duLieu, "kichThuoc");
         Long dich = DuLieu.id(duLieu, "nguoiNhanId", true);
+        var coTinThoai = duLieu.get("tinThoai");
+        if (coTinThoai != null && (!coTinThoai.isJsonPrimitive() || !coTinThoai.getAsJsonPrimitive().isBoolean())) {
+            throw new IllegalArgumentException();
+        }
+        boolean tinThoai = coTinThoai != null && coTinThoai.getAsBoolean();
         if (ten.isBlank() || ten.length() > 180 || ten.equals(".") || ten.equals("..") ||
                 ten.indexOf('/') >= 0 || ten.indexOf('\\') >= 0 ||
                 ten.chars().anyMatch(Character::isISOControl)) {
@@ -47,6 +58,10 @@ public final class TepModel {
         }
         if (kichThuoc > gioiHanTep) {
             throw new LoiNghiepVuModel("tepQuaLon", "Tệp tối đa 10 MB.");
+        }
+        if (tinThoai && (kichThuoc <= 44 || kichThuoc > GIOI_HAN_TIN_THOAI
+                || !ten.toLowerCase(Locale.ROOT).endsWith(".wav"))) {
+            throw tinThoaiSai();
         }
         if (!ma.matches("[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}") || !sha.matches("[a-f0-9]{64}") ||
                 noiDung.length() > 4000) {
@@ -58,8 +73,9 @@ public final class TepModel {
             }
             tepDao.kiemTraNguoiNhan(nguoiGui, dich);
         }
+        String macDinh = tinThoai ? "Tin nhắn thoại" : "Tệp: " + ten;
         return new ThongTin(nguoiGui, dich, ma, ten, kichThuoc, sha,
-                noiDung.isEmpty() ? "Tệp: " + ten : noiDung, DuLieu.id(duLieu, "traLoiId", true));
+                noiDung.isEmpty() ? macDinh : noiDung, DuLieu.id(duLieu, "traLoiId", true), tinThoai);
     }
 
     public static long so(JsonObject duLieu, String ten) {
@@ -75,9 +91,38 @@ public final class TepModel {
     }
 
     public KetQuaLuuModel hoanTat(ThongTin thongTin, Path tam) throws SQLException, IOException {
-        byte[] anhThu = taoAnhThu(tam);
+        if (thongTin.tinThoai()) {
+            kiemTraTinThoai(tam);
+        }
+        byte[] anhThu = thongTin.tinThoai() ? null : taoAnhThu(tam);
         String maLuu = UUID.randomUUID().toString();
         return tepDao.hoanTat(thongTin, tam, duongDan(maLuu), maLuu, anhThu);
+    }
+
+    private void kiemTraTinThoai(Path tep) throws IOException {
+        try {
+            var thongTin = AudioSystem.getAudioFileFormat(tep.toFile());
+            if (!AudioFileFormat.Type.WAVE.equals(thongTin.getType())) {
+                throw tinThoaiSai();
+            }
+            try (var vao = AudioSystem.getAudioInputStream(tep.toFile())) {
+                AudioFormat dinhDang = vao.getFormat();
+                long soKhung = vao.getFrameLength();
+                if (!AudioFormat.Encoding.PCM_SIGNED.equals(dinhDang.getEncoding())
+                        || dinhDang.getSampleRate() != 16_000 || dinhDang.getChannels() != 1
+                        || dinhDang.getSampleSizeInBits() != 16 || dinhDang.getFrameSize() != 2 || dinhDang.isBigEndian()
+                        || soKhung <= 0 || soKhung > SO_KHUNG_THOAI
+                        || vao.transferTo(OutputStream.nullOutputStream()) != soKhung * 2) {
+                    throw tinThoaiSai();
+                }
+            }
+        } catch (UnsupportedAudioFileException loi) {
+            throw tinThoaiSai();
+        }
+    }
+
+    private LoiNghiepVuModel tinThoaiSai() {
+        return new LoiNghiepVuModel("tinThoaiSai", "Đoạn ghi âm phải là WAV hợp lệ, dài tối đa 60 giây.");
     }
 
     /**
@@ -105,7 +150,7 @@ public final class TepModel {
         return tep;
     }
 
-    private record TepDuocPhep(Path tep, long kichThuoc, String sha, String ten, byte[] anhThu) {
+    private record TepDuocPhep(Path tep, long kichThuoc, String sha, String ten, String loai, byte[] anhThu) {
     }
 
     private TepDuocPhep choPhep(long nguoiDung, long tinId, boolean layAnh) throws SQLException, IOException {
@@ -114,7 +159,7 @@ public final class TepModel {
         if (!Files.isRegularFile(tep) || Files.size(tep) != duLieu.kichThuoc()) {
             throw new LoiNghiepVuModel("tepKhongCon", "Tệp trên máy chủ không còn đầy đủ.");
         }
-        return new TepDuocPhep(tep, duLieu.kichThuoc(), duLieu.sha(), duLieu.ten(), duLieu.anhThu());
+        return new TepDuocPhep(tep, duLieu.kichThuoc(), duLieu.sha(), duLieu.ten(), duLieu.loai(), duLieu.anhThu());
     }
 
     public KetQuaLuuModel chuyenTiep(long nguoi, long tinId, JsonObject duLieu,
@@ -125,6 +170,7 @@ public final class TepModel {
         khai.addProperty("kichThuoc", Long.toString(tep.kichThuoc()));
         khai.addProperty("sha256", tep.sha());
         khai.addProperty("noiDung", noiDung);
+        khai.addProperty("tinThoai", tep.loai().equals("thoai"));
         khai.remove("traLoiId");
         ThongTin thongTin = kiemTra(nguoi, khai);
         JsonObject cu = timDaGui(thongTin);

@@ -8,6 +8,7 @@ import client.hatang.TruyenTepTCP;
 import com.google.gson.*;
 import giaothuc.DuLieu;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -199,8 +200,7 @@ final class ThongTinChatView {
         BorderPane trang = new BorderPane(cuon);
         trang.setId("thongTinHoiThoai");
         trang.getStyleClass().add("bangThongTin");
-        trang.prefWidthProperty().bind(javafx.beans.binding.Bindings.min(392,
-                javafx.beans.binding.Bindings.max(320, hoiThoai.widthProperty().multiply(0.33))));
+        trang.prefWidthProperty().bind(Bindings.min(392, Bindings.max(320, hoiThoai.widthProperty().multiply(0.33))));
         trang.setMinWidth(320);
         Label tenBang = DoHoaView.nhan("Thông tin hội thoại", "tenBangThongTin");
         Button dong = DoHoaView.nut("×", "dongBangThongTin");
@@ -211,8 +211,6 @@ final class ThongTinChatView {
         Runnable tat = hoiThoai.moBangThongTin(trang);
         dong.setOnAction(e -> tat.run());
 
-        Button chan = DoHoaView.nut("Chặn", "nutThaoTacNguyHiem");
-        chan.setDisable(true);
         if (dich == null) {
             dau.getChildren().add(DoHoaView.nhan("Phòng chat chung", "tenHoSo"));
         } else {
@@ -226,9 +224,6 @@ final class ThongTinChatView {
                 Button hoSo = DoHoaView.nut("Trang cá nhân", "nutHoSoPhu");
                 hoSo.setOnAction(e -> hoSo(trang, banBe, dich, moChat));
                 dau.getChildren().setAll(dauHoSo(ho), hoSo);
-                boolean daChan = ho.has("daChan") && ho.get("daChan").getAsBoolean();
-                datNutChan(trang, dieuKhien, dich, chan, daChan);
-                chan.setDisable(false);
             }));
         }
 
@@ -236,6 +231,12 @@ final class ThongTinChatView {
         themMuc(noiDung, trang, dieuKhien, dich, dieuKhienAnh, tai, denTin, "tepRieng", "Tệp", 3);
         themMuc(noiDung, trang, dieuKhien, dich, dieuKhienAnh, tai, denTin, "lienKet", "Liên kết", 3);
         if (dich != null) {
+            var daChan = hoiThoai.daChanDoiPhuong();
+            Button chan = DoHoaView.nut("", "nutThaoTacNguyHiem");
+            chan.setId("chanNguoiDung");
+            chan.textProperty().bind(Bindings.when(daChan).then("Bỏ chặn").otherwise("Chặn"));
+            chan.disableProperty().bind(hoiThoai.chuaBietTrangThaiChan());
+            chan.setOnAction(e -> hoiThoai.xacNhanChan(trang, dich, hoiThoai.tenHoiThoai(), !daChan.get()));
             Button xoa = DoHoaView.nut("Xóa cuộc trò chuyện", "nutThaoTacNguyHiem");
             xoa.setOnAction(e -> ThongBaoNoiView.xacNhan(trang, "Xóa cuộc trò chuyện",
                     "Lịch sử hiện tại sẽ bị xóa khỏi hộp thư của bạn. Người kia vẫn thấy tin nhắn của họ.",
@@ -247,34 +248,6 @@ final class ThongTinChatView {
             xoa.setMaxWidth(Double.MAX_VALUE);
             noiDung.getChildren().add(thaoTac);
         }
-    }
-
-    private static void datNutChan(Node neo, HoiThoaiController dieuKhien, String dich, Button nut,
-                                   boolean daChan) {
-        nut.setText(daChan ? "Bỏ chặn" : "Chặn");
-        nut.setOnAction(e -> {
-            if (daChan) {
-                nut.setDisable(true);
-                dieuKhien.chan(dich, false)
-                        .whenComplete((tra, sai) -> Platform.runLater(() -> {
-                            nut.setDisable(false);
-                            if (sai == null) {
-                                datNutChan(neo, dieuKhien, dich, nut, false);
-                            } else {
-                                ThongBaoNoiView.xacNhan(neo, "Không thể bỏ chặn", DoHoaView.thongBao(sai),
-                                        "Đóng",
-                                        () -> java.util.concurrent.CompletableFuture.completedFuture(null));
-                            }
-                        }));
-            } else {
-                ThongBaoNoiView.xacNhan(neo, "Chặn người dùng",
-                        "Hai tài khoản sẽ không thể gửi tin nhắn riêng cho nhau cho đến khi bỏ chặn.", "Chặn",
-                        () -> dieuKhien.chan(dich, true).thenApply(tra -> {
-                            Platform.runLater(() -> datNutChan(neo, dieuKhien, dich, nut, true));
-                            return null;
-                        }));
-            }
-        });
     }
 
     private static void themMuc(VBox noiDung, Node neo, HoiThoaiController dieuKhien, String dich,

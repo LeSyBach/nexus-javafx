@@ -1,6 +1,8 @@
 package client.view;
 
+import client.model.GiaoDienModel;
 import giaothuc.DuLieu;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.text.Text;
@@ -8,7 +10,36 @@ import javafx.scene.text.Text;
 import java.util.concurrent.CompletionException;
 
 public final class DoHoaView {
+    private static final String CSS_CHINH = DoHoaView.class.getResource("/giao-dien.css").toExternalForm();
+    private static final String CSS_TOI = DoHoaView.class.getResource("/giao-dien-toi.css").toExternalForm();
+    private static final GiaoDienModel GIAO_DIEN = new GiaoDienModel();
+
     private DoHoaView() {
+    }
+
+    public static void ganGiaoDien(Scene canh) {
+        canh.getStylesheets().add(CSS_CHINH);
+        apDungGiaoDien(canh, GIAO_DIEN.toi());
+    }
+
+    static boolean giaoDienToi() {
+        return GIAO_DIEN.toi();
+    }
+
+    static boolean doiGiaoDien(Scene canh, boolean toi) {
+        boolean daLuu = GIAO_DIEN.luu(toi);
+        apDungGiaoDien(canh, toi);
+        return daLuu;
+    }
+
+    private static void apDungGiaoDien(Scene canh, boolean toi) {
+        if (toi) {
+            if (!canh.getStylesheets().contains(CSS_TOI)) {
+                canh.getStylesheets().add(CSS_TOI);
+            }
+        } else {
+            canh.getStylesheets().remove(CSS_TOI);
+        }
     }
 
     static Label nhan(String chu, String lop) {
